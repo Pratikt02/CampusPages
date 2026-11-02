@@ -1,0 +1,28 @@
+{
+  "name": "campuspages",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "build": "npm run build -w client",
+    "start": "node server/src/server.js",
+    "init-db": "npm run init-db -w server",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "npm test -w server && npm test -w client",
+    "audit:deps": "npm audit --omit=dev"
+  },
+  "devDependencies": {
+    "autocannon": "^8.0.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
+  }
+}

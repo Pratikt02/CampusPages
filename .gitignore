@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+coverage/
+tmp/
+uploads/
+*.log
+.DS_Store
+.vscode/
+loadtest/results/
+loadtest/cookies.json
