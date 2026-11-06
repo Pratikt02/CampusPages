@@ -16,10 +16,13 @@ import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminUpload from './features/admin/pages/AdminUpload.jsx';
 import AdminDocuments from './features/admin/pages/AdminDocuments.jsx';
 import { ProtectedRoute, RoleGuard } from './routes/guards.jsx';
+import Seo from './components/Seo.jsx';
 
 // Public routes are deliberately NOT wrapped in any auth guard. Guards are UX only; the API enforces access.
 export default function App() {
   return (
+    <>
+      <Seo />
     <Routes>
       <Route element={<PublicLayout />}>
         <Route index element={<HomePage />} />
@@ -46,5 +49,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 }

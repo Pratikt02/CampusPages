@@ -62,7 +62,7 @@ export default function NotesLibrary() {
           <h1>Notes Library</h1>
           <p className="muted">Browse published learning materials by academic year, branch, semester, and subject.</p>
         </div>
-        <div className="notes-library-mark" aria-hidden="true"><BookOpen size={30} /><span>One library<br />for every course</span></div>
+          <div className="notes-library-mark" aria-hidden="true"><span className="notes-library-mark-icon"><BookOpen size={25} /></span><span><small>YOUR STUDY SPACE</small>One library<br />for every course</span></div>
       </header>
 
       <nav className="notes-breadcrumbs" aria-label="Notes library path">

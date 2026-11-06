@@ -3,6 +3,7 @@ import { publicApi } from '../api/public.js';
 import { useAsync } from '../hooks/useAsync.js';
 import { useProtectedAction, libraryPathFor } from '../features/subjects/SubjectGrid.jsx';
 import { ErrorState, LoadingSkeleton } from '../components/StateViews.jsx';
+import Seo from '../components/Seo.jsx';
 
 export default function SubjectDetailPage() {
   const { subjectId } = useParams();
@@ -10,6 +11,7 @@ export default function SubjectDetailPage() {
   const { open, modal } = useProtectedAction();
   return (
     <section className="section">
+      <Seo title={data ? `${data.name} study materials` : 'Subject study materials'} description={data?.description || (data ? `Browse ${data.materialCount} published study ${data.materialCount === 1 ? 'resource' : 'resources'} for ${data.name} on CampusPages.` : undefined)} noIndex={!data || !!error} />
       <div className="container">
         <p><Link to="/subjects">← All subjects</Link></p>
         {loading && <LoadingSkeleton rows={2} />}

@@ -73,15 +73,27 @@ describe('authorization on every content request', () => {
     const r = await request(app).get(f.url);
     expect(r.status).toBe(401); expect(storage.state.getCalls).toBe(0);
   });
-  it('offers downloads only through the same authenticated published-content stream', async () => {
-    const f = await seed({ size: 256 });
-    const r = await S.agent.get(`${f.url}?download=true`);
-    expect(r.status).toBe(200);
-    expect(r.headers['content-disposition']).toBe(`attachment; filename="campuspages-${f.doc.id}.pdf"`);
-    expect(r.body).toEqual(f.data);
-    expect((await request(app).get(`${f.url}?download=true`)).status).toBe(401);
-    expect((await S.agent.get(`${f.url}?download=yes`)).status).toBe(400);
-  });
+  it('allows authenticated users to view documents but prevents downloads', async () => {
+  const f = await seed({ size: 256 });
+
+  // Authenticated users can view documents.
+  const view = await S.agent.get(f.url);
+
+  expect(view.status).toBe(200);
+  expect(view.headers['content-disposition']).toBe('inline');
+  expect(view.body).toEqual(f.data);
+
+  // Download requests must be rejected.
+  const download = await S.agent.get(`${f.url}?download=true`);
+  expect(download.status).toBe(400);
+
+  const downloadYes = await S.agent.get(`${f.url}?download=yes`);
+  expect(downloadYes.status).toBe(400);
+
+  // Unauthenticated users cannot access documents.
+  const guest = await request(app).get(f.url);
+  expect(guest.status).toBe(401);
+});
   it('disabled accounts and revoked sessions are blocked on the next request', async () => {
     const f = await seed();
     expect((await S.agent.get(f.url)).status).toBe(200);

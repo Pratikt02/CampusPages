@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /app
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /signup
+Disallow: /unauthorized
+Disallow: /api/
+Sitemap: https://campuspages.onrender.com/sitemap.xml

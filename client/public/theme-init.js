@@ -3,7 +3,7 @@
 (function () {
   try {
     var saved = localStorage.getItem('cp-theme');
-    var theme = saved === 'light' || saved === 'dark' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var theme = saved === 'light' || saved === 'dark' ? saved : 'light';
     document.documentElement.dataset.theme = theme;
   } catch (e) { document.documentElement.dataset.theme = 'light'; }
 })();

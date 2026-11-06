@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BookOpen, Filter, Search } from 'lucide-react';
+import { BookOpen, Filter } from 'lucide-react';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { docsApi } from '../../api/documents.js';
 import { publicApi } from '../../api/public.js';
@@ -47,7 +47,7 @@ export default function StudentDashboard() {
     <div className="page-shell">
       <header className="dashboard-hero">
         <div>
-          <span className="eyebrow">Learning portal</span>
+          <span className="eyebrow dashboard-eyebrow"><BookOpen size={15} aria-hidden="true" /> Learning portal</span>
           <h1>Welcome, {user.name}</h1>
           <p className="muted">Browse protected study materials, discover new topics, and pick up right where your coursework left off.</p>
         </div>
@@ -65,7 +65,7 @@ export default function StudentDashboard() {
       <div className="card resource-toolbar">
         <div className="resource-toolbar-head">
           <Filter size={18} aria-hidden="true" />
-          <span>Filter resources</span>
+          <span><strong>Find your next resource</strong><small>Search by title or narrow the list by subject and file type.</small></span>
         </div>
         <div className="filters" role="search" style={{ marginBlock: 0 }}>
           <label className="field">
