@@ -39,7 +39,8 @@ beforeEach(async () => {
 });
 
 describe('production configuration', () => {
-  const prod = { NODE_ENV: 'production', CLIENT_ORIGINS: 'https://app.example.edu', CLOUDINARY_CLOUD_NAME: 'c', CLOUDINARY_API_KEY: 'k', CLOUDINARY_API_SECRET: 's' };
+  const prod = { NODE_ENV: 'production', CLIENT_ORIGINS: 'https://app.example.edu', CLOUDINARY_CLOUD_NAME: 'c', CLOUDINARY_API_KEY: 'k', CLOUDINARY_API_SECRET: 's',
+    REGISTRATION_OTP_SECRET: 'production-registration-otp-secret-at-least-32-chars', SMTP_HOST: 'smtp.example.edu', SMTP_USER: 'user', SMTP_PASSWORD: 'password', SMTP_FROM: 'CampusPages <noreply@example.edu>' };
   it('issues a __Host- session cookie that is Secure, HttpOnly, SameSite=Lax, Path=/ and has no Domain', async () => {
     const app = createApp(loadConfig({ ...prod, LOGIN_MAX_PER_15MIN: '1000' }), { storage });
     const res = await request(app).post('/api/auth/login').set('Origin', 'https://app.example.edu').send({ email: 'student@example.edu', password: PW });

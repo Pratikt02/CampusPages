@@ -18,7 +18,7 @@ import { httpError } from './middleware/auth.js';
 import { CSP_DIRECTIVES } from './config/csp.js';
 import { notFound, errorHandler } from './middleware/errors.js';
 
-export function createApp(config, { storage = createStorage(config) } = {}) {
+export function createApp(config, { storage = createStorage(config), sendEmail } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.set('etag', false); // authenticated JSON must never be revalidated from a cache
@@ -39,7 +39,7 @@ export function createApp(config, { storage = createStorage(config) } = {}) {
     handler: (_q, _s, next) => next(httpError(429, 'RATE_LIMITED', 'Too many requests. Try again shortly.')) }));
   app.use('/api', requestTimeout(config.requestTimeoutMs, (req) => /^\/documents\/[^/]+\/content$/.test(req.path) || (req.method === 'POST' && req.path === '/admin/documents')));
   app.use(['/api/auth', '/api/admin'], (_req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  app.use('/api/auth', authRouter(config));
+  app.use('/api/auth', authRouter(config, { sendEmail }));
   app.use('/api/public', publicRouter(config));
   app.use('/api/documents', documentsRouter(config, { storage }));
   app.use('/api/admin', adminRouter(config, { storage }));

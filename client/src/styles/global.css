@@ -3282,6 +3282,8 @@ body {
 .confirm-hint.matches { color: var(--success); }
 .register-modern-page .register-submit { min-height: 3.15rem; margin-top: .3rem; border-radius: .8rem; }
 .register-modern-page .register-footnote { margin-top: 1.25rem; padding-top: 1rem; }
+.register-modern-page .link-button { padding: 0; border: 0; background: none; color: var(--brand); font: inherit; font-weight: 700; cursor: pointer; }
+.register-modern-page .link-button:hover { text-decoration: underline; }
 .register-modern-page .register-photo-side { display: flex; min-width: 0; }
 .register-story-card { overflow: hidden; width: 100%; border: 1px solid color-mix(in srgb, var(--brand) 16%, var(--border)); border-radius: 1.5rem; background: var(--surface); box-shadow: var(--shadow-lg); animation: login-story-in 760ms cubic-bezier(.2,.75,.25,1) 100ms both; transition: transform 300ms ease, box-shadow 300ms ease; }
 .register-story-card:hover { transform: translateY(-4px); box-shadow: 0 30px 80px color-mix(in srgb, var(--brand) 18%, transparent), var(--shadow-lg); }

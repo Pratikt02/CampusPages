@@ -3,6 +3,7 @@ import PublicLayout from './layouts/PublicLayout.jsx';
 import HomePage from './pages/HomePage.jsx';
 import SubjectsPage from './pages/SubjectsPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import UnauthorizedPage from './pages/UnauthorizedPage.jsx';
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="subjects/:subjectId" element={<SubjectDetailPage />} />
       </Route>
       <Route path="login" element={<LoginPage />} />
+      <Route path="forgot-password" element={<ForgotPasswordPage />} />
       <Route path="register" element={<RegisterPage />} />
       <Route path="signup" element={<RegisterPage />} />
       <Route path="unauthorized" element={<UnauthorizedPage />} />

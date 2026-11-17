@@ -5,13 +5,16 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config/env.js';
 import { User } from '../src/models/User.js';
+import { RegistrationOtp } from '../src/models/RegistrationOtp.js';
+import { PasswordResetOtp } from '../src/models/PasswordResetOtp.js';
 import { Session } from '../src/models/Session.js';
 import { hashPassword } from '../src/services/password.js';
 
 const ORIGIN = 'http://localhost:5173';
 const PW = 'correct-horse-battery';
-const config = loadConfig({ NODE_ENV: 'test', CLIENT_ORIGINS: ORIGIN, LOGIN_MAX_PER_15MIN: '1000' });
+const config = loadConfig({ NODE_ENV: 'test', CLIENT_ORIGINS: ORIGIN, LOGIN_MAX_PER_15MIN: '1000', REGISTRATION_OTP_SECRET: 'test-registration-otp-secret-at-least-32-chars' });
 let mongod, app;
+const sentOtps = new Map();
 
 const mkUser = async (over = {}) => User.create({
   name: 'Test', email: 'student@example.edu', role: 'student', passwordHash: await hashPassword(PW), ...over });
@@ -26,11 +29,11 @@ async function signIn(email = 'student@example.edu') {
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
-  await User.syncIndexes(); await Session.syncIndexes();
-  app = createApp(config);
+  await User.syncIndexes(); await Session.syncIndexes(); await RegistrationOtp.syncIndexes(); await PasswordResetOtp.syncIndexes();
+  app = createApp(config, { sendEmail: async ({ to, code }) => { sentOtps.set(to, code); } });
 });
 afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
-beforeEach(async () => { await User.deleteMany({}); await Session.deleteMany({}); });
+beforeEach(async () => { await User.deleteMany({}); await Session.deleteMany({}); await RegistrationOtp.deleteMany({}); await PasswordResetOtp.deleteMany({}); sentOtps.clear(); });
 
 describe('login', () => {
   it('succeeds, sets an HttpOnly SameSite=Lax cookie, and never returns the hash or token', async () => {
@@ -148,24 +151,119 @@ describe('role authorization', () => {
     await User.updateOne({ _id: a._id }, { role: 'student' });
     expect((await agent.get('/api/admin/ping')).status).toBe(403);
   });
-  it('allows public student registration while keeping admin-creation endpoints gated', async () => {
+  it('creates accounts only after email verification and keeps admin-creation endpoints gated', async () => {
     const register = await request(app).post('/api/auth/register').set('Origin', ORIGIN).send({
       name: 'New Student', email: 'newstudent@example.edu', password: PW, confirmPassword: PW,
     });
-    expect(register.status).toBe(201);
-    expect(register.body.user).toMatchObject({ name: 'New Student', email: 'newstudent@example.edu', role: 'student' });
-    expect(await User.countDocuments({})).toBe(1);
+    expect(register.status).toBe(202);
+    expect(register.body.message).toMatch(/verification code/i);
+    expect(sentOtps.get('newstudent@example.edu')).toMatch(/^\d{6}$/);
+    expect(await User.countDocuments({})).toBe(0);
 
     const signup = await request(app).post('/api/auth/signup').set('Origin', ORIGIN).send({
       name: 'Another Student', email: 'anotherstudent@example.edu', password: PW, confirmPassword: PW,
     });
-    expect(signup.status).toBe(201);
-    expect(signup.body.user).toMatchObject({ name: 'Another Student', email: 'anotherstudent@example.edu', role: 'student' });
+    expect(signup.status).toBe(202);
+    expect(await User.countDocuments({})).toBe(0);
+
+    const newStudentOtp = sentOtps.get('newstudent@example.edu');
+    const invalid = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+      .send({ email: 'newstudent@example.edu', code: newStudentOtp === '000000' ? '000001' : '000000' });
+    expect(invalid.status).toBe(400);
+
+    const successfulVerification = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+      .send({ email: 'newstudent@example.edu', code: newStudentOtp });
+    expect(successfulVerification.status).toBe(201);
+    expect(successfulVerification.headers['set-cookie'][0]).toMatch(/HttpOnly/i);
+    expect(successfulVerification.body.user).toMatchObject({ name: 'New Student', email: 'newstudent@example.edu', role: 'student' });
+    expect(await User.countDocuments({})).toBe(1);
+    expect(await RegistrationOtp.countDocuments({})).toBe(1);
+
+    const anotherVerification = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+      .send({ email: 'anotherstudent@example.edu', code: sentOtps.get('anotherstudent@example.edu') });
+    expect(anotherVerification.status).toBe(201);
+    expect(anotherVerification.body.user).toMatchObject({ name: 'Another Student', email: 'anotherstudent@example.edu', role: 'student' });
     expect(await User.countDocuments({})).toBe(2);
 
     for (const p of ['/api/admin/users', '/api/users']) {
       const r = await request(app).post(p).set('Origin', ORIGIN).send({ email: 'x@y.co', password: 'x'.repeat(12), role: 'admin' });
       expect([401, 404]).toContain(r.status); // auth-gated routes remain protected; unknown routes stay hidden
     }
+  });
+
+  it('limits OTP guesses and removes a challenge after the final failed attempt', async () => {
+    await request(app).post('/api/auth/register').set('Origin', ORIGIN).send({
+      name: 'Pending Student', email: 'pending@example.edu', password: PW, confirmPassword: PW,
+    });
+    const sentCode = sentOtps.get('pending@example.edu');
+    expect((await RegistrationOtp.findOne({ email: 'pending@example.edu' })).codeHash).not.toBe(sentCode);
+    const wrongCode = sentCode === '000000' ? '000001' : '000000';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const response = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+        .send({ email: 'pending@example.edu', code: wrongCode });
+      expect(response.status).toBe(400);
+    }
+    expect(await RegistrationOtp.countDocuments({ email: 'pending@example.edu' })).toBe(0);
+    expect(await User.countDocuments({ email: 'pending@example.edu' })).toBe(0);
+    const locked = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+      .send({ email: 'pending@example.edu', code: sentCode });
+    expect(locked.status).toBe(400);
+  });
+
+  it('rejects expired verification codes without creating an account', async () => {
+    await request(app).post('/api/auth/register').set('Origin', ORIGIN).send({
+      name: 'Expired Student', email: 'expired@example.edu', password: PW, confirmPassword: PW,
+    });
+    await RegistrationOtp.updateOne({ email: 'expired@example.edu' }, { expiresAt: new Date(Date.now() - 1000) });
+    const response = await request(app).post('/api/auth/verify-registration').set('Origin', ORIGIN)
+      .send({ email: 'expired@example.edu', code: sentOtps.get('expired@example.edu') });
+    expect(response.status).toBe(400);
+    expect(await RegistrationOtp.countDocuments({ email: 'expired@example.edu' })).toBe(0);
+    expect(await User.countDocuments({ email: 'expired@example.edu' })).toBe(0);
+  });
+});
+
+describe('password reset', () => {
+  it('returns the same public response for unknown and known emails and never reveals whether email exists', async () => {
+    await mkUser();
+    const known = await request(app).post('/api/auth/forgot-password').set('Origin', ORIGIN)
+      .send({ email: 'student@example.edu' });
+    const unknown = await request(app).post('/api/auth/forgot-password').set('Origin', ORIGIN)
+      .send({ email: 'nobody@example.edu' });
+    expect(known.status).toBe(202);
+    expect(unknown.status).toBe(202);
+    expect(known.body).toEqual(unknown.body);
+    expect(sentOtps.get('student@example.edu')).toMatch(/^\d{6}$/);
+  });
+
+  it('updates the password, revokes sessions, and rejects reuse', async () => {
+    await mkUser();
+    const { agent, cookie } = await signIn();
+    await agent.post('/api/auth/forgot-password').set('Origin', ORIGIN).send({ email: 'student@example.edu' });
+    const code = sentOtps.get('student@example.edu');
+    const newPassword = 'new-correct-horse';
+
+    const reset = await request(app).post('/api/auth/reset-password').set('Origin', ORIGIN)
+      .send({ email: 'student@example.edu', code, password: newPassword, confirmPassword: newPassword });
+    expect(reset.status).toBe(200);
+    expect((await request(app).get('/api/auth/me').set('Cookie', cookie)).status).toBe(401);
+    expect((await login(request(app), 'student@example.edu', PW)).status).toBe(401);
+    expect((await login(request(app), 'student@example.edu', newPassword)).status).toBe(200);
+
+    const reuse = await request(app).post('/api/auth/reset-password').set('Origin', ORIGIN)
+      .send({ email: 'student@example.edu', code, password: 'another-password', confirmPassword: 'another-password' });
+    expect(reuse.status).toBe(400);
+  });
+
+  it('limits reset code guesses', async () => {
+    await mkUser();
+    await request(app).post('/api/auth/forgot-password').set('Origin', ORIGIN).send({ email: 'student@example.edu' });
+    const sentCode = sentOtps.get('student@example.edu');
+    const wrongCode = sentCode === '000000' ? '000001' : '000000';
+    for (let attempt = 0; attempt < 5; attempt++) {
+      expect((await request(app).post('/api/auth/reset-password').set('Origin', ORIGIN)
+        .send({ email: 'student@example.edu', code: wrongCode, password: 'new-password-1', confirmPassword: 'new-password-1' })).status).toBe(400);
+    }
+    expect(await PasswordResetOtp.countDocuments({ email: 'student@example.edu' })).toBe(0);
   });
 });

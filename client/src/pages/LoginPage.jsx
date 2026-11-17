@@ -43,6 +43,7 @@ export default function LoginPage() {
           </form>
           <p className="auth-meta">
             <Link to="/">Back to home</Link>
+            <Link to="/forgot-password">Forgot password?</Link>
             <Link to="/register">Create account</Link>
           </p>
         </div>
