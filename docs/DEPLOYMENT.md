@@ -58,7 +58,7 @@ npm run build       # builds client/dist
    cd server
    npm run create-user -- --role admin --email you@school.edu --name "Your Name"
    ```
-   Create students the same way without `--role`. There is deliberately no web endpoint that creates accounts.
+   Students can create accounts through the web registration page. For managed accounts, use the same command without `--role`.
 
 ## 5. Cloudinary (private file storage)
 
@@ -78,8 +78,6 @@ Set these in your host's dashboard. **Never commit them.** Defaults for everythi
 | `CLIENT_ORIGINS` | your exact public URL, `https://your-app.example.com` (https only; the server refuses to start otherwise) |
 | `MONGODB_URI` | the Atlas string |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | from Cloudinary (the server refuses production without them; in-memory storage is refused in production) |
-| `REGISTRATION_OTP_SECRET` | a random secret at least 32 characters long; keep it consistent across server instances |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP server credentials and the sender address used for registration verification codes |
 | `TRUST_PROXY` | `true` (the host's proxy sets `X-Forwarded-For`; without it every user shares the proxy's IP for rate limiting) |
 | `API_MAX_PER_MIN` | raise (e.g. `20000`) if many students share one campus IP |
 | `PORT` | usually set by the host |

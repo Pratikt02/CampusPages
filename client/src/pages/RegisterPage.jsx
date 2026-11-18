@@ -11,8 +11,6 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const from = safeDestination(useLocation().state?.from);
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
-  const [step, setStep] = useState('details');
-  const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -24,22 +22,6 @@ export default function RegisterPage() {
 
   async function submit(e) {
     e.preventDefault();
-    if (step === 'verify') {
-      if (!/^\d{6}$/.test(otp)) {
-        setError('Enter the 6-digit verification code sent to your email.');
-        return;
-      }
-      setBusy(true); setError('');
-      try {
-        const data = await api('/auth/verify-registration', { method: 'POST', body: { email: form.email, code: otp } });
-        setCsrfToken(data.csrfToken);
-        navigate(dest(data.user), { replace: true });
-      } catch (err) {
-        setError(err.message);
-        setBusy(false);
-      }
-      return;
-    }
     if (!form.name.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
       setError('All fields are required.');
       return;
@@ -54,12 +36,12 @@ export default function RegisterPage() {
     }
     setBusy(true); setError('');
     try {
-      await api('/auth/register', {
+      const data = await api('/auth/register', {
         method: 'POST',
         body: { name: form.name, email: form.email, password: form.password, confirmPassword: form.confirmPassword }
       });
-      setStep('verify');
-      setBusy(false);
+      setCsrfToken(data.csrfToken);
+      navigate(dest(data.user), { replace: true });
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -93,9 +75,8 @@ export default function RegisterPage() {
             <h1>Create your student account</h1>
             <p className="register-subtitle">Join CampusPages and start building your academic library today.</p>
           </div>
-          <div className="register-progress"><span>STUDENT ACCOUNT</span><span>{step === 'verify' ? 'Verify your email' : 'Secure sign up'}</span></div>
+          <div className="register-progress"><span>STUDENT ACCOUNT</span><span>Secure sign up</span></div>
           <form onSubmit={submit} noValidate>
-            {step === 'details' ? <>
             <div className="field register-field"><label htmlFor="register-name">Full name</label>
               <div className="field-input-wrap">
                 <User size={18} aria-hidden="true" />
@@ -137,27 +118,10 @@ export default function RegisterPage() {
               </div>
               {form.confirmPassword && <span className={`confirm-hint${form.confirmPassword === form.password ? ' matches' : ''}`} aria-live="polite">{form.confirmPassword === form.password ? 'Passwords match' : 'Passwords do not match yet'}</span>}
             </div>
-            </> : <>
-              <p className="register-subtitle">Enter the 6-digit code we sent to <strong>{form.email}</strong>. The code expires in 10 minutes.</p>
-              <div className="field register-field"><label htmlFor="register-otp">Verification code</label>
-                <div className="field-input-wrap">
-                  <Mail size={18} aria-hidden="true" />
-                  <input id="register-otp" type="text" inputMode="numeric" autoComplete="one-time-code" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} aria-invalid={!!error} required maxLength={6} pattern="[0-9]{6}" placeholder="6-digit code" />
-                </div>
-              </div>
-            </>}
             {error && <p role="alert" className="error register-error"><AlertCircle size={16} aria-hidden="true" /> {error}</p>}
-            <button className="btn btn-primary auth-submit register-submit" disabled={busy}>{busy ? (step === 'verify' ? 'Verifying code…' : 'Sending code…') : step === 'verify' ? <>Verify and create account <span aria-hidden="true">→</span></> : <>Continue with email verification <span aria-hidden="true">→</span></>}</button>
-            {step === 'verify' && <button className="btn btn-secondary auth-submit" type="button" disabled={busy} onClick={async () => {
-              setBusy(true); setError('');
-              try {
-                await api('/auth/register', { method: 'POST', body: { name: form.name, email: form.email, password: form.password, confirmPassword: form.confirmPassword } });
-                setOtp('');
-              } catch (err) { setError(err.message); }
-              setBusy(false);
-            }}>Send a new code</button>}
+            <button className="btn btn-primary auth-submit register-submit" disabled={busy}>{busy ? 'Creating account…' : <>Create account <span aria-hidden="true">→</span></>}</button>
           </form>
-          <p className="auth-footnote register-footnote">{step === 'verify' ? <button className="link-button" type="button" onClick={() => { setStep('details'); setOtp(''); setError(''); }}>Back to account details</button> : <>Already have an account? <Link to="/login">Sign in</Link></>}</p>
+          <p className="auth-footnote register-footnote">Already have an account? <Link to="/login">Sign in</Link></p>
         </div>
         <aside className="auth-side auth-side-featured register-photo-side">
           <div className="register-story-card">

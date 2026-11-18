@@ -6,13 +6,12 @@ import { Session } from '../models/Session.js';
 import { Subject } from '../models/Subject.js';
 import { Document } from '../models/Document.js';
 import { AuditEvent } from '../models/AuditEvent.js';
-import { RegistrationOtp } from '../models/RegistrationOtp.js';
 
 const uri = process.env.MONGODB_URI;
 if (!uri) { console.error('MONGODB_URI is not set'); process.exit(1); }
 await mongoose.connect(uri, { serverSelectionTimeoutMS: 8000 });
 try {
-  for (const m of [User, Session, RegistrationOtp, Subject, Document, AuditEvent]) {
+  for (const m of [User, Session, Subject, Document, AuditEvent]) {
     await m.syncIndexes();
     const idx = await m.collection.indexes();
     console.log(`${m.modelName}: ${idx.map((i) => i.name).join(', ')}`);

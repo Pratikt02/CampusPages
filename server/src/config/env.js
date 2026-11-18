@@ -12,16 +12,6 @@ export function loadConfig(env = process.env) {
     throw new Error('CLIENT_ORIGINS must be explicit https:// origins in production');
   }
   const num = (v, d) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
-  const registrationOtpSecret = env.REGISTRATION_OTP_SECRET || '';
-  if (isProd && registrationOtpSecret.length < 32) throw new Error('REGISTRATION_OTP_SECRET must be at least 32 characters in production');
-  const smtp = {
-    host: env.SMTP_HOST || '',
-    port: Math.floor(num(env.SMTP_PORT, 587)),
-    user: env.SMTP_USER || '',
-    password: env.SMTP_PASSWORD || '',
-    from: env.SMTP_FROM || '',
-  };
-  if (isProd && Object.values(smtp).some((value) => !value)) throw new Error('SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM are required in production');
   const cld = [env.CLOUDINARY_CLOUD_NAME, env.CLOUDINARY_API_KEY, env.CLOUDINARY_API_SECRET].every(Boolean);
   const storageDriver = env.STORAGE_DRIVER || (cld ? 'cloudinary' : 'memory');
   if (!['cloudinary', 'memory'].includes(storageDriver)) throw new Error('STORAGE_DRIVER must be cloudinary or memory');
@@ -29,7 +19,6 @@ export function loadConfig(env = process.env) {
   if (isProd && storageDriver !== 'cloudinary') throw new Error('Production requires STORAGE_DRIVER=cloudinary');
   return Object.freeze({
     nodeEnv, isProd,
-    registrationOtpSecret, smtp,
     port: num(env.PORT, 4000),
     clientOrigins: origins,
     mongoUri: env.MONGODB_URI || '',
