@@ -12,7 +12,7 @@ Status key: **T** = covered by automated tests that were run; **B** = checked in
 | Strict CORS + Origin check | T | Allow-list only; unsafe requests from other origins are rejected and audited. |
 | CSRF | T | Per-session token in `X-CSRF-Token` on every unsafe method, plus Origin check. |
 | Password hashing | T | argon2id (OWASP minimum profile); dummy verification for unknown emails. |
-| Session expiry and revocation | T | Idle 60 min / absolute 12 h, TTL index, hashed tokens, logout, **sign out everywhere**, cap of 5 live sessions per user; account status and role are re-read from the database on every request. |
+| Session expiry and revocation | T | Idle 30 days / absolute 30 days, TTL index, hashed tokens, logout, **sign out everywhere**, cap of 5 live sessions per user; account status and role are re-read from the database on every request. |
 | Login and abuse rate limits | T | Per IP, **per account** (successful logins excluded), global per-IP API limit, per-user content limit, public-endpoint limit. All are per process (see risks). |
 | Input validation | T | Strict allow-lists; unknown fields rejected (no mass assignment); operator-injection attempts rejected; ids validated. |
 | File validation | T | Extension allow-list, magic bytes, extension/content/MIME agreement, size cap, PDF readable + page cap, image dimension cap; SVG/GIF rejected. |

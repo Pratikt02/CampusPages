@@ -39,6 +39,7 @@ describe('login', () => {
     expect(res.status).toBe(200);
     const cookie = res.headers['set-cookie'][0];
     expect(cookie).toMatch(/HttpOnly/i); expect(cookie).toMatch(/SameSite=Lax/i);
+    expect(cookie).toMatch(/Max-Age=2592000/i);
     expect(res.body.user).toEqual({ id: expect.any(String), name: 'Test', email: 'student@example.edu', role: 'student' });
     expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|argon2/);
   });
