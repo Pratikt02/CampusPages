@@ -16,6 +16,7 @@ beforeEach(() => {
     'GET /api/auth/me': () => json(200, { user: ADMIN, csrfToken: 'csrf1' }),
     'GET /api/admin/subjects': () => json(200, { items: [{ id: 's1', name: 'Operating Systems', slug: 'os', description: '' }] }),
     'GET /api/admin/documents?page=1&limit=10': () => json(200, { items: [DOC], page: 1, limit: 10, total: 1, pages: 1 }),
+    'GET /api/admin/active-users': () => json(200, { count: 0 }),
   };
   globalThis.fetch = vi.fn((url, o = {}) => { const h = routes[`${o.method ?? 'GET'} ${url}`]; return h ? h(o) : json(404, { error: { message: 'nf' } }); });
 });
@@ -24,9 +25,12 @@ const at = (p) => render(<ThemeProvider><MemoryRouter initialEntries={[p]}><Auth
 describe('admin documents', () => {
   it('lists documents with text status badges and shows real stats on the dashboard', async () => {
     routes['GET /api/admin/stats'] = () => json(200, { total: 7, published: 3, drafts: 4, inProgress: 0, failed: 0, pdf: 5, image: 2, totalBytes: 2048 });
+    routes['GET /api/admin/active-users'] = () => json(200, { count: 3 });
     at('/admin');
     expect(await screen.findByText('Total documents')).toBeInTheDocument();
     expect(screen.getByText('7')).toBeInTheDocument();
+    expect(await screen.findByText('Active students (last 5 min)')).toBeInTheDocument();
+    expect(within(screen.getByText('Active students (last 5 min)').parentElement).getByText('3')).toBeInTheDocument();
   });
   it('shows an error state with retry when stats fail', async () => {
     routes['GET /api/admin/stats'] = () => json(500, { error: { message: 'Something went wrong.' } });

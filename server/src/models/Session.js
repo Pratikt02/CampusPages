@@ -12,4 +12,5 @@ const sessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+sessionSchema.index({ revokedAt: 1, lastSeenAt: 1 });
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);

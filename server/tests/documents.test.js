@@ -62,7 +62,7 @@ describe('access control', () => {
     const id = '64b7f0c2a1b2c3d4e5f60718';
     const routes = [['get', '/api/admin/documents'], ['get', `/api/admin/documents/${id}`], ['post', '/api/admin/documents'],
       ['patch', `/api/admin/documents/${id}`], ['patch', `/api/admin/documents/${id}/publish`], ['put', `/api/admin/documents/${id}/file`], ['delete', `/api/admin/documents/${id}`],
-      ['get', '/api/admin/stats'], ['get', '/api/admin/subjects'], ['post', '/api/admin/subjects']];
+      ['get', '/api/admin/stats'], ['get', '/api/admin/active-users'], ['get', '/api/admin/subjects'], ['post', '/api/admin/subjects']];
     for (const [m, url] of routes) {
       expect((await request(app)[m](url).set('Origin', ORIGIN)).status).toBe(401);
       expect((await send(studentS, m, url)).status).toBe(403);
@@ -71,6 +71,26 @@ describe('access control', () => {
   it('upload requires the CSRF token', async () => {
     const r = await adminS.agent.post('/api/admin/documents').set('Origin', ORIGIN).field('title', 'x');
     expect(r.status).toBe(403); expect(r.body.error.code).toBe('CSRF');
+  });
+});
+
+describe('admin active users', () => {
+  it('counts unique students with a recent, valid session and excludes admins', async () => {
+    const now = new Date();
+    const session = (index, overrides = {}) => Session.create({
+      tokenHash: String(index).padStart(64, '0'), user: student._id, csrfToken: `csrf-${index}`,
+      lastSeenAt: now, idleExpiresAt: new Date(+now + 60_000), expiresAt: new Date(+now + 3_600_000),
+      ...overrides,
+    });
+    await session(1);
+    await session(2, { lastSeenAt: new Date(+now - 10 * 60_000) });
+    await session(3, { revokedAt: now });
+    await session(4, { idleExpiresAt: new Date(+now - 1) });
+
+    const response = await adminS.agent.get('/api/admin/active-users');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ count: 1 });
+    expect(response.headers['cache-control']).toBe('no-store');
   });
 });
 

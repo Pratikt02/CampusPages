@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import { Document } from '../models/Document.js';
 import { Subject, slugify } from '../models/Subject.js';
+import { Session } from '../models/Session.js';
+import { User } from '../models/User.js';
 import { audit } from '../models/AuditEvent.js';
 import { requireAuth, requireRole, httpError } from '../middleware/auth.js';
 import { inspectFile, makeObjectKey, validateMetadata, isObjectId } from '../documents/validation.js';
@@ -63,6 +65,20 @@ export function adminRouter(config, { storage }) {
       return { total, published, drafts, inProgress, failed, pdf, image, totalBytes: bytes[0]?.n ?? 0 };
     });
     res.json(stats);
+  }));
+
+  r.get('/active-users', wrap(async (_req, res) => {
+    const now = new Date();
+    const activeSince = new Date(+now - 5 * 60_000);
+    const [result] = await Session.aggregate([
+      { $match: { revokedAt: null, lastSeenAt: { $gte: activeSince }, idleExpiresAt: { $gt: now }, expiresAt: { $gt: now } } },
+      { $group: { _id: '$user' } },
+      { $lookup: { from: User.collection.name, localField: '_id', foreignField: '_id', as: 'user' } },
+      { $unwind: '$user' },
+      { $match: { 'user.role': 'student', 'user.status': 'active' } },
+      { $count: 'count' },
+    ]);
+    res.json({ count: result?.count ?? 0 });
   }));
 
   r.get('/subjects', wrap(async (_req, res) => {
