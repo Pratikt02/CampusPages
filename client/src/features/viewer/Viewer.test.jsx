@@ -19,7 +19,11 @@ let routes; let content;
 beforeEach(() => {
   openPdf.mockReset(); notifyUnauthorized.mockReset(); globalThis.__viewport = { width: 800, height: 600 };
   content = vi.fn();
-  routes = { 'GET /api/auth/me': () => json(200, { user: STUDENT, csrfToken: 't' }), 'GET /api/documents/d1': () => json(200, META) };
+  routes = {
+    'GET /api/auth/me': () => json(200, { user: STUDENT, csrfToken: 't' }),
+    'GET /api/auth/activity': () => json(204, null),
+    'GET /api/documents/d1': () => json(200, META),
+  };
   globalThis.fetch = vi.fn((url, o = {}) => {
     if (url === '/api/documents/d1/content') return content(url, o);
     const h = routes[`${o.method ?? 'GET'} ${url.split('?')[0]}`]; return h ? h(o) : json(404, { error: { message: 'nf' } });
@@ -112,8 +116,28 @@ describe('ViewerPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'OS Notes' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Back to library' })).toHaveAttribute('href', '/app');
     expect(openPdf).toHaveBeenCalledWith('/api/documents/d1/content', expect.objectContaining({ length: 5000 }));
+    expect(fetch).toHaveBeenCalledWith('/api/auth/activity', expect.objectContaining({ credentials: 'include' }));
     expect(screen.getAllByTestId('watermark')[0]).toHaveTextContent(/^s\*{5}t@example\.edu · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     expect(screen.queryByRole('button', { name: /download|print/i })).not.toBeInTheDocument();
+  });
+  it('refreshes activity while the note reader stays open and stops on unmount', async () => {
+    fakePdf();
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = at('/app/documents/d1');
+    try {
+      await screen.findByRole('toolbar', { name: /document controls/i });
+      const intervalIndex = intervalSpy.mock.calls.findIndex(([, delay]) => delay === 60_000);
+      expect(intervalIndex).toBeGreaterThanOrEqual(0);
+      const interval = intervalSpy.mock.calls[intervalIndex];
+      interval[0]();
+      await waitFor(() => expect(fetch.mock.calls.filter(([url]) => url === '/api/auth/activity')).toHaveLength(2));
+      unmount();
+      expect(clearIntervalSpy).toHaveBeenCalledWith(intervalSpy.mock.results[intervalIndex].value);
+    } finally {
+      intervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
   });
   it('ignores identity-looking query parameters: the watermark always comes from the authenticated session', async () => {
     fakePdf(); at('/app/documents/d1?watermark=attacker@evil.com&user=admin@example.edu&email=boss@x.org');

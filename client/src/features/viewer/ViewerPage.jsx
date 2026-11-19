@@ -1,6 +1,7 @@
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { api } from '../../api/client.js';
 import { docsApi } from '../../api/documents.js';
 import { useAsync } from '../../hooks/useAsync.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -17,6 +18,22 @@ export default function ViewerPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const { loading, error, data, reload } = useAsync((s) => docsApi.get(id, s), [id]);
+  const [activityError, setActivityError] = useState(false);
+  useEffect(() => {
+    if (!data) return undefined;
+    let mounted = true;
+    const heartbeat = async () => {
+      try {
+        await api('/auth/activity');
+        if (mounted) setActivityError(false);
+      } catch (e) {
+        if (mounted && e.status !== 401) setActivityError(true);
+      }
+    };
+    heartbeat();
+    const interval = setInterval(heartbeat, 60_000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, [data]);
   // Identity comes from the authenticated session (/api/auth/me), never from the URL or any query parameter.
   const identity = useMemo(() => `${maskEmail(user?.email)} · ${formatStamp(new Date())}`, [user?.email]);
   const Viewer = data?.fileType === 'image' ? ImageViewer : PdfViewer;
@@ -30,6 +47,7 @@ export default function ViewerPage() {
         <div className="viewer-actions"><ThemeToggle /></div>
       </header>
       <main id="reader" className="viewer-main">
+        {activityError && <p className="muted" role="status">Activity status couldn’t be updated. Check your connection.</p>}
         {loading && <div style={{ padding: '1rem' }}><LoadingSkeleton rows={2} /></div>}
         {error?.status === 404 && <div className="viewer-state"><h2>Document not available</h2><p className="muted">This document doesn’t exist or isn’t published.</p><Link to="/app" className="btn btn-primary">Back to library</Link></div>}
         {error && error.status !== 404 && <ErrorState message={error.message} onRetry={reload} />}

@@ -94,6 +94,18 @@ describe('current user and sessions', () => {
     expect(me.status).toBe(200); expect(me.headers['cache-control']).toBe('no-store');
     expect(me.body.user.email).toBe('student@example.edu');
   });
+  it('activity heartbeat requires a session and refreshes the session activity timestamp', async () => {
+    await mkUser();
+    const { agent } = await signIn();
+    const previousActivity = new Date(Date.now() - 2 * 60_000);
+    await Session.updateOne({}, { lastSeenAt: previousActivity });
+
+    expect((await request(app).get('/api/auth/activity')).status).toBe(401);
+    const heartbeat = await agent.get('/api/auth/activity');
+    expect(heartbeat.status).toBe(204);
+    expect(heartbeat.headers['cache-control']).toBe('no-store');
+    expect((await Session.findOne({})).lastSeenAt.getTime()).toBeGreaterThan(previousActivity.getTime());
+  });
   it('logout revokes the session server-side (replaying the old cookie fails)', async () => {
     await mkUser();
     const { agent, csrf, cookie } = await signIn();

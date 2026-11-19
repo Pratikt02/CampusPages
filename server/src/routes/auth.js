@@ -71,6 +71,8 @@ export function authRouter(config) {
     res.json({ user: publicUser(req.auth.user), csrfToken: req.auth.session.csrfToken });
   });
 
+  r.get('/activity', auth, (_req, res) => res.status(204).end());
+
   r.post('/logout', auth, async (req, res, next) => {
     try {
       await revokeSession(req.auth.session._id);
