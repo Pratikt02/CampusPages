@@ -12,7 +12,7 @@ const IDENTITY = 's*****t@example.edu · 2026-01-05 09:07';
 let renders; let destroy;
 const makePdf = (n) => ({ numPages: n, getPage: vi.fn(async (p) => ({
   getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale }),
-  render: vi.fn(() => { const task = { promise: Promise.resolve(), cancel: vi.fn() }; renders.push({ p, task }); return task; }),
+  render: vi.fn((options) => { const task = { promise: Promise.resolve(), cancel: vi.fn() }; renders.push({ p, task, viewport: options.viewport }); return task; }),
   cleanup: vi.fn(),
 })) });
 const load = (n = 5) => { const pdf = makePdf(n); destroy = vi.fn(); openPdf.mockResolvedValue({ promise: Promise.resolve(pdf), destroy }); return pdf; };
@@ -20,7 +20,11 @@ const show = (...nums) => globalThis.__setVisible((el) => nums.includes(Number(e
 const mount = (props = {}) => render(<PdfViewer docId="d1" title="OS Notes" identity={IDENTITY} size={123456} {...props} />);
 const ready = () => screen.findByRole('toolbar', { name: /document controls/i });
 
-beforeEach(() => { renders = []; openPdf.mockReset(); notifyUnauthorized.mockReset(); globalThis.__viewport = { width: 800, height: 600 }; });
+beforeEach(() => {
+  renders = []; openPdf.mockReset(); notifyUnauthorized.mockReset();
+  globalThis.__viewport = { width: 800, height: 600 };
+  Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+});
 
 describe('PdfViewer', () => {
   it('shows loading, opens through the authorized range loader with the known length, and has no download/print controls', async () => {
@@ -59,6 +63,18 @@ describe('PdfViewer', () => {
     expect(renders[0].task.cancel).toHaveBeenCalled();                  // render for the old scale was cancelled
     await globalThis.__setVisible((el) => el.dataset.page === '1', false);
     await waitFor(() => expect(canvas.width).toBe(0));                  // canvas memory released when far away
+  });
+  it('re-renders visible pages at the updated resolution after browser zoom changes', async () => {
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 1 });
+    load(2); mount(); await ready(); await show(1);
+    await waitFor(() => expect(renders).toHaveLength(1));
+    const initialWidth = renders[0].viewport.width;
+
+    Object.defineProperty(window, 'devicePixelRatio', { configurable: true, value: 2 });
+    fireEvent(window, new Event('resize'));
+    await waitFor(() => expect(renders).toHaveLength(2), { timeout: 1000 });
+    expect(renders[1].viewport.width).toBeGreaterThan(initialWidth);
+    expect(renders[0].task.cancel).toHaveBeenCalled();
   });
   it('supports fit-to-width, fit-to-page and preset zoom steps with limits', async () => {
     load(3); mount(); await ready();

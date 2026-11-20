@@ -9,7 +9,7 @@ const errorText = (e) => (e?.status === 401 ? 'Your session has expired. Please 
   : e?.status === 404 ? 'This document is no longer available.' : 'The document could not be loaded.');
 
 // One page: a placeholder of the right size until it is near the viewport, then a canvas. Far-away pages release their canvas.
-function PdfPage({ pdf, pageNumber, scale, base, root, identity, registerEl }) {
+function PdfPage({ pdf, pageNumber, scale, outputDpr, base, root, identity, registerEl }) {
   const ref = useRef(null); const canvas = useRef(null);
   const [near, setNear] = useState(false);
   const [dims, setDims] = useState(base);
@@ -33,7 +33,7 @@ function PdfPage({ pdf, pageNumber, scale, base, root, identity, registerEl }) {
         if (cancelled) return;
         const unit = page.getViewport({ scale: 1 });
         setDims({ w: unit.width, h: unit.height });
-        const out = outputScaleFor(unit.width * scale, unit.height * scale, window.devicePixelRatio);
+        const out = outputScaleFor(unit.width * scale, unit.height * scale, outputDpr);
         const vp = page.getViewport({ scale: scale * out });
         c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
         task = page.render({ canvasContext: c.getContext('2d'), viewport: vp });
@@ -42,7 +42,7 @@ function PdfPage({ pdf, pageNumber, scale, base, root, identity, registerEl }) {
       } catch (e) { if (!cancelled && !isRenderCancelled(e)) setFailed(true); }
     })();
     return () => { cancelled = true; task?.cancel(); page?.cleanup?.(); }; // cancel obsolete render tasks
-  }, [near, scale, pdf, pageNumber]);
+  }, [near, scale, outputDpr, pdf, pageNumber]);
 
   const w = dims.w * scale; const h = dims.h * scale;
   return (
@@ -60,6 +60,7 @@ export default function PdfViewer({ docId, title, identity, size: fileSize }) {
   const [mode, setMode] = useState('page'); const [custom, setCustom] = useState(1);
   const [isMinimized, setIsMinimized] = useState(false);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [outputDpr, setOutputDpr] = useState(() => (window.devicePixelRatio || 1) * (window.visualViewport?.scale || 1));
   const [current, setCurrent] = useState(1); const [pageInput, setPageInput] = useState('1');
   const scroller = useRef(null); const els = useRef(new Map()); const raf = useRef(0);
   const registerEl = useCallback((n, el) => { if (el) els.current.set(n, el); else els.current.delete(n); }, []);
@@ -88,6 +89,24 @@ export default function PdfViewer({ docId, title, identity, size: fileSize }) {
     const ro = new ResizeObserver(([e]) => setSize({ w: e.contentRect.width, h: e.contentRect.height }));
     ro.observe(el); return () => ro.disconnect();
   }, [state.status]);
+
+  useEffect(() => {
+    let timer;
+    const updateDpr = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        setOutputDpr((window.devicePixelRatio || 1) * (window.visualViewport?.scale || 1));
+      }, 120);
+    };
+    const viewport = window.visualViewport;
+    window.addEventListener('resize', updateDpr);
+    viewport?.addEventListener('resize', updateDpr);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', updateDpr);
+      viewport?.removeEventListener('resize', updateDpr);
+    };
+  }, []);
 
   const base = state.base ?? { w: 1, h: 1 };
   const scale = mode === 'custom' ? custom : mode === 'page' ? fitPageScale(size.w, size.h, base.w, base.h) : fitWidthScale(size.w, base.w);
@@ -157,7 +176,7 @@ export default function PdfViewer({ docId, title, identity, size: fileSize }) {
       <div ref={scroller} className="viewer-scroll" tabIndex={0} onScroll={onScroll} onKeyDown={onKey} onContextMenu={(e) => e.preventDefault()} aria-label="Document pages. Use plus and minus to zoom, 0 to fit width.">
         <div className="pdf-pages">
           {Array.from({ length: total }, (_, i) => (
-            <PdfPage key={i + 1} pdf={state.pdf} pageNumber={i + 1} scale={scale} base={state.base} root={scroller} identity={identity} registerEl={registerEl} />
+            <PdfPage key={i + 1} pdf={state.pdf} pageNumber={i + 1} scale={scale} outputDpr={outputDpr} base={state.base} root={scroller} identity={identity} registerEl={registerEl} />
           ))}
         </div>
       </div>

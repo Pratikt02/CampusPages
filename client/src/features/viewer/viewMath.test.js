@@ -19,7 +19,8 @@ describe('zoom and fit', () => {
     expect(nextZoom(0.19, -1)).toBe(0.19); expect(nextZoom(0.19, +1)).toBe(0.25);
   });
   it('limits canvas resolution for huge pages', () => {
-    expect(outputScaleFor(600, 800, 3)).toBe(2);
+    expect(outputScaleFor(600, 800, 3)).toBe(3);
+    expect(outputScaleFor(600, 800, 5)).toBe(4);
     expect(outputScaleFor(600, 800, 1)).toBe(1);
     expect(outputScaleFor(6000, 8000, 2, 16_000_000)).toBeLessThan(1);
     expect(outputScaleFor(6000, 8000, 2, 16_000_000) ** 2 * 6000 * 8000).toBeLessThanOrEqual(16_000_001);

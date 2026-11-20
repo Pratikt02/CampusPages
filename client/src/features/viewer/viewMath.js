@@ -16,9 +16,9 @@ export const fitPageScale = (viewW, viewH, contentW, contentH, pad = 32) =>
   viewW > 0 && viewH > 0 && contentW > 0 && contentH > 0
     ? clamp(Math.min((viewW - pad) / contentW, (viewH - pad) / contentH), FIT_MIN, MAX_ZOOM) : 1;
 
-// Limits canvas memory: shrink the device pixel ratio until width*height*ratio^2 <= maxPixels.
+// Limits canvas memory while preserving browser zoom resolution where the page size allows it.
 export function outputScaleFor(widthCss, heightCss, dpr = 1, maxPixels = 16_000_000) {
-  const wanted = clamp(dpr || 1, 1, 2);
+  const wanted = clamp(dpr || 1, 1, 4);
   const cap = Math.sqrt(maxPixels / Math.max(widthCss * heightCss, 1));
   return Math.max(Math.min(wanted, cap), 0.25);
 }
