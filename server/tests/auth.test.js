@@ -40,7 +40,10 @@ describe('login', () => {
     const cookie = res.headers['set-cookie'][0];
     expect(cookie).toMatch(/HttpOnly/i); expect(cookie).toMatch(/SameSite=Lax/i);
     expect(cookie).toMatch(/Max-Age=2592000/i);
-    expect(res.body.user).toEqual({ id: expect.any(String), name: 'Test', email: 'student@example.edu', role: 'student' });
+    expect(res.body.user).toEqual({
+      id: expect.any(String), name: 'Test', email: 'student@example.edu', role: 'student',
+      studentId: null, course: '', semester: null, branch: null, preferredLanguage: 'en',
+    });
     expect(JSON.stringify(res.body)).not.toMatch(/passwordHash|argon2/);
   });
   it('stores only a hash of the session token', async () => {
@@ -85,6 +88,45 @@ describe('login', () => {
 });
 
 describe('current user and sessions', () => {
+  it('updates the authenticated student profile and exposes it through /me', async () => {
+    await mkUser();
+    const { agent, csrf } = await signIn();
+    const res = await agent.patch('/api/auth/profile')
+      .set('Origin', ORIGIN)
+      .set('X-CSRF-Token', csrf)
+      .send({
+        name: 'Updated Student',
+        studentId: 'STU-2026-001',
+        course: 'B.Tech',
+        semester: 5,
+        branch: 'IT',
+        preferredLanguage: 'hi',
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toMatchObject({
+      name: 'Updated Student',
+      studentId: 'STU-2026-001',
+      course: 'B.Tech',
+      semester: 5,
+      branch: 'IT',
+      preferredLanguage: 'hi',
+    });
+    const me = await agent.get('/api/auth/me');
+    expect(me.body.user.name).toBe('Updated Student');
+  });
+  it('rejects invalid profile values and duplicate student IDs', async () => {
+    await mkUser();
+    await mkUser({ email: 'other@example.edu', studentId: 'TAKEN-1' });
+    const { agent, csrf } = await signIn();
+    const invalid = await agent.patch('/api/auth/profile')
+      .set('Origin', ORIGIN).set('X-CSRF-Token', csrf)
+      .send({ name: 'Student', studentId: null, course: 'B.Tech', semester: 13, branch: null, preferredLanguage: 'en' });
+    expect(invalid.status).toBe(400);
+    const duplicate = await agent.patch('/api/auth/profile')
+      .set('Origin', ORIGIN).set('X-CSRF-Token', csrf)
+      .send({ name: 'Student', studentId: 'TAKEN-1', course: '', semester: null, branch: null, preferredLanguage: 'en' });
+    expect(duplicate.status).toBe(409);
+  });
   it('GET /me requires a session and returns no-store', async () => {
     expect((await request(app).get('/api/auth/me')).status).toBe(401);
     expect((await request(app).get('/api/auth/me').set('Cookie', 'cp_sid=garbage-garbage-garbage-garbage')).status).toBe(401);

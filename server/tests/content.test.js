@@ -68,6 +68,40 @@ beforeEach(async () => {
 afterEach(() => { storage.hooks.hold = null; });
 
 describe('authorization on every content request', () => {
+  it('tracks a student reading a published note and clears presence when the reader leaves', async () => {
+    const f = await seed();
+    const readingToken = '12345678-1234-1234-1234-123456789abc';
+    const start = () => S.agent.post('/api/auth/reading').set('Origin', ORIGIN).set('X-CSRF-Token', S.csrf)
+      .send({ documentId: String(f.doc._id), readingToken });
+    expect((await request(app).post('/api/auth/reading').send({ documentId: String(f.doc._id), readingToken })).status).toBe(401);
+    expect((await start()).status).toBe(204);
+    const session = await Session.findOne({ user: student._id });
+    expect(session.readingDocument).toEqual(f.doc._id);
+    expect(session.readingStartedAt).toBeInstanceOf(Date);
+    const directory = await A.agent.get('/api/admin/currently-reading');
+    expect(directory.status).toBe(200);
+    expect(directory.body.items).toMatchObject([{
+      student: { name: 'S', email: 'student@example.edu' },
+      document: { id: String(f.doc._id), title: 'Doc', subject: 'OS' },
+    }]);
+    expect((await S.agent.get('/api/admin/currently-reading')).status).toBe(403);
+    const cleared = await S.agent.delete(`/api/auth/reading/${f.doc.id}/${readingToken}`)
+      .set('Origin', ORIGIN).set('X-CSRF-Token', S.csrf);
+    expect(cleared.status).toBe(204);
+    expect((await A.agent.get('/api/admin/currently-reading')).body.items).toHaveLength(0);
+  });
+  it('does not track drafts or stale reading sessions', async () => {
+    const draft = await seed({ over: { publicationStatus: 'draft' } });
+    const readingToken = '12345678-1234-1234-1234-123456789abc';
+    const invalid = await S.agent.post('/api/auth/reading').set('Origin', ORIGIN).set('X-CSRF-Token', S.csrf)
+      .send({ documentId: String(draft.doc._id), readingToken });
+    expect(invalid.status).toBe(404);
+    const f = await seed();
+    await S.agent.post('/api/auth/reading').set('Origin', ORIGIN).set('X-CSRF-Token', S.csrf)
+      .send({ documentId: String(f.doc._id), readingToken });
+    await Session.updateOne({ user: student._id }, { readingUpdatedAt: new Date(Date.now() - 3 * 60_000) });
+    expect((await A.agent.get('/api/admin/currently-reading')).body.items).toHaveLength(0);
+  });
   it('guests get 401 and no bytes', async () => {
     const f = await seed();
     const r = await request(app).get(f.url);

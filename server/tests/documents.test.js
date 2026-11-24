@@ -62,7 +62,8 @@ describe('access control', () => {
     const id = '64b7f0c2a1b2c3d4e5f60718';
     const routes = [['get', '/api/admin/documents'], ['get', `/api/admin/documents/${id}`], ['post', '/api/admin/documents'],
       ['patch', `/api/admin/documents/${id}`], ['patch', `/api/admin/documents/${id}/publish`], ['put', `/api/admin/documents/${id}/file`], ['delete', `/api/admin/documents/${id}`],
-      ['get', '/api/admin/stats'], ['get', '/api/admin/active-users'], ['get', '/api/admin/subjects'], ['post', '/api/admin/subjects']];
+      ['get', '/api/admin/stats'], ['get', '/api/admin/active-users'], ['get', '/api/admin/students'], ['get', '/api/admin/currently-reading'],
+      ['get', '/api/admin/subjects'], ['post', '/api/admin/subjects']];
     for (const [m, url] of routes) {
       expect((await request(app)[m](url).set('Origin', ORIGIN)).status).toBe(401);
       expect((await send(studentS, m, url)).status).toBe(403);
@@ -91,6 +92,28 @@ describe('admin active users', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ count: 1 });
     expect(response.headers['cache-control']).toBe('no-store');
+  });
+});
+
+describe('admin student directory', () => {
+  it('lists only student profiles with searchable pagination and no credential fields', async () => {
+    await User.create({
+      name: 'A Student', email: 'a.student@example.edu', role: 'student', passwordHash: 'secret-hash',
+      studentId: 'STU-001', course: 'B.Tech IT', semester: 4, branch: 'IT', preferredLanguage: 'hi',
+    });
+    await User.create({ name: 'B Student', email: 'b.student@example.edu', role: 'student', passwordHash: 'secret-hash', course: 'B.Sc Biology' });
+    const first = await adminS.agent.get('/api/admin/students?limit=1&page=1');
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ total: 3, page: 1, limit: 1, pages: 3 });
+    expect(first.body.items[0]).toMatchObject({
+      name: 'A Student', email: 'a.student@example.edu', studentId: 'STU-001',
+      course: 'B.Tech IT', semester: 4, branch: 'IT', preferredLanguage: 'hi',
+    });
+    expect(first.headers['cache-control']).toBe('no-store');
+    expect(JSON.stringify(first.body)).not.toMatch(/password|secret-hash/);
+    expect((await adminS.agent.get('/api/admin/students?q=biology')).body.total).toBe(1);
+    expect((await adminS.agent.get('/api/admin/students?q=.*')).body.total).toBe(0);
+    expect((await adminS.agent.get('/api/admin/students?page[$ne]=1')).status).toBe(400);
   });
 });
 

@@ -45,6 +45,18 @@ describe('public shell (guest)', () => {
 });
 
 describe('authentication UX', () => {
+  it.each(['/login', '/register'])('uses the lowercase fetchpriority attribute on %s', async (path) => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderAt(path);
+      const image = await screen.findByRole('img', { name: /student studying among the tall shelves/i });
+      expect(image).toHaveAttribute('fetchpriority', 'high');
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it('guests on a protected route are sent to login', async () => {
     renderAt('/app');
     expect(await screen.findByRole('heading', { name: /student login/i })).toBeInTheDocument();

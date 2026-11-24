@@ -31,6 +31,10 @@ export function AuthProvider({ children }) {
     setState({ status: 'anonymous', user: null, expired: false });
   }, []);
 
-  const value = useMemo(() => ({ ...state, login, logout }), [state, login, logout]);
+  const updateUser = useCallback((user) => {
+    setState((current) => ({ ...current, user }));
+  }, []);
+
+  const value = useMemo(() => ({ ...state, login, logout, updateUser }), [state, login, logout, updateUser]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

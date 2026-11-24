@@ -6,6 +6,10 @@ const sessionSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   csrfToken: { type: String, required: true },
   lastSeenAt: { type: Date, required: true },
+  readingDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'Document', default: null },
+  readingToken: { type: String, default: null },
+  readingStartedAt: { type: Date, default: null },
+  readingUpdatedAt: { type: Date, default: null },
   idleExpiresAt: { type: Date, required: true },
   expiresAt: { type: Date, required: true }, // absolute expiry; TTL index removes the doc
   revokedAt: { type: Date, default: null },
@@ -13,4 +17,5 @@ const sessionSchema = new mongoose.Schema({
 
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 sessionSchema.index({ revokedAt: 1, lastSeenAt: 1 });
+sessionSchema.index({ readingUpdatedAt: 1, readingDocument: 1 });
 export const Session = mongoose.models.Session || mongoose.model('Session', sessionSchema);

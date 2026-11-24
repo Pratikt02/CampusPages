@@ -3,6 +3,8 @@ import { api, ApiError, getCsrfToken, notifyUnauthorized } from './client.js';
 export const adminApi = {
   stats: (signal) => api('/admin/stats', { signal }),
   activeUsers: (signal) => api('/admin/active-users', { signal }),
+  currentlyReading: (signal) => api('/admin/currently-reading', { signal }),
+  students: (params, signal) => api(`/admin/students?${new URLSearchParams(Object.entries(params).filter(([, v]) => v))}`, { signal }),
   subjects: (signal) => api('/admin/subjects', { signal }),
   createSubject: (body) => api('/admin/subjects', { method: 'POST', body }),
   list: (params, signal) => api(`/admin/documents?${new URLSearchParams(Object.entries(params).filter(([, v]) => v))}`, { signal }),

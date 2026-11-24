@@ -53,7 +53,7 @@ export default function LoginPage() {
                 className="login-photo"
                 src="https://images.unsplash.com/photo-1741699427706-7bfb38c716d8?auto=format&fit=crop&w=1400&q=85"
                 alt="A student studying among the tall shelves of a university library"
-                fetchPriority="high"
+                fetchpriority="high"
               />
               <span className="login-photo-label">A calmer place to study</span>
             </div>

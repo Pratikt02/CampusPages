@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { FileText, LayoutDashboard, LogOut, Menu, Upload, X } from 'lucide-react';
+import { BookOpen, FileText, LayoutDashboard, LogOut, Menu, Upload, Users, X } from 'lucide-react';
 import { BrandLogo } from '../../components/BrandLogo.jsx';
 import { ThemeToggle } from '../../components/ThemeToggle.jsx';
 import { ToastProvider } from '../../components/Toast.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 
-const NAV = [['/admin', 'Dashboard', LayoutDashboard, true], ['/admin/upload', 'Upload', Upload], ['/admin/documents', 'Documents', FileText]];
+const NAV = [['/admin', 'Dashboard', LayoutDashboard, true], ['/admin/upload', 'Upload', Upload], ['/admin/documents', 'Documents', FileText], ['/admin/students', 'Students', Users], ['/admin/currently-reading', 'Currently reading', BookOpen]];
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();

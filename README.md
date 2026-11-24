@@ -116,6 +116,8 @@ Open any document from the library (`/app/documents/:id`): a distraction-free re
 
 **Personalized watermark:** every PDF page and the image stage carry a tiled, non-interactive overlay showing a *masked* email (`s*****t@example.edu`) and the open time. The identity comes from the authenticated session (`/api/auth/me`); URL/query parameters are never used (tested).
 
+**Daily reading milestones:** time spent with a document open in the visible reader tab is tracked locally per signed-in user and local calendar day. A celebratory modal appears at each completed hour; reading time pauses while the tab is hidden or the celebration is open, and resets at local midnight. Progress is browser-local and is not synchronized across devices.
+
 **How PDF.js loads the file (important):** by default PDF.js opens with an un-ranged request and keeps streaming the whole file; measured against the Phase 5 endpoint this made the server pull the entire file from storage even though PDF.js cancelled early. `client/src/features/viewer/rangeTransport.js` therefore supplies PDF.js with a custom range transport: the first chunk and every later chunk are explicit, individually authorized `Range` requests (max 4 in parallel, one retry on 502/503/network errors, strict `Content-Range`/length validation). If a range request later fails (session ended, document unpublished), the reader shows an error state and the worker is terminated after a short grace period.
 
 ### Limitations (honest)

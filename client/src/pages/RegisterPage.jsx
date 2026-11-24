@@ -126,7 +126,7 @@ export default function RegisterPage() {
         <aside className="auth-side auth-side-featured register-photo-side">
           <div className="register-story-card">
             <div className="register-photo-wrap">
-              <img className="register-photo" src="https://images.unsplash.com/photo-1741699427706-7bfb38c716d8?auto=format&fit=crop&w=1400&q=85" alt="A student studying among the tall shelves of a university library" fetchPriority="high" />
+              <img className="register-photo" src="https://images.unsplash.com/photo-1741699427706-7bfb38c716d8?auto=format&fit=crop&w=1400&q=85" alt="A student studying among the tall shelves of a university library" fetchpriority="high" />
               <span className="register-photo-caption">Your next great study session starts here.</span>
             </div>
             <div className="register-story-copy">

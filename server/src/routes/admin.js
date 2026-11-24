@@ -81,6 +81,87 @@ export function adminRouter(config, { storage }) {
     res.json({ count: result?.count ?? 0 });
   }));
 
+  r.get('/currently-reading', wrap(async (_req, res) => {
+    const now = new Date();
+    const recentlyUpdated = new Date(+now - 2 * 60_000);
+    const sessions = await Session.find({
+      readingDocument: { $ne: null },
+      readingUpdatedAt: { $gte: recentlyUpdated },
+      revokedAt: null,
+      idleExpiresAt: { $gt: now },
+      expiresAt: { $gt: now },
+    }).sort({ readingUpdatedAt: -1 }).limit(100).select('user readingDocument readingStartedAt readingUpdatedAt').lean();
+    if (!sessions.length) return res.json({ items: [] });
+
+    const [users, documents] = await Promise.all([
+      User.find({ _id: { $in: sessions.map((session) => session.user) }, role: 'student', status: 'active' })
+        .select('name email course semester branch').lean(),
+      Document.find({ _id: { $in: sessions.map((session) => session.readingDocument) }, publicationStatus: 'published', processingStatus: 'ready' })
+        .select('title subject').populate('subject', 'name').lean(),
+    ]);
+    const userById = new Map(users.map((user) => [String(user._id), user]));
+    const documentById = new Map(documents.map((document) => [String(document._id), document]));
+    const items = sessions.flatMap((session) => {
+      const user = userById.get(String(session.user));
+      const document = documentById.get(String(session.readingDocument));
+      if (!user || !document) return [];
+      return [{
+        id: String(session._id),
+        student: {
+          name: user.name,
+          email: user.email,
+          course: user.course ?? '',
+          semester: user.semester ?? null,
+          branch: user.branch ?? null,
+        },
+        document: { id: String(document._id), title: document.title, subject: document.subject?.name ?? '' },
+        startedAt: session.readingStartedAt,
+        updatedAt: session.readingUpdatedAt,
+      }];
+    });
+    res.set('Cache-Control', 'no-store');
+    res.json({ items });
+  }));
+
+  r.get('/students', wrap(async (req, res) => {
+    const { q } = req.query;
+    for (const value of [q, req.query.page, req.query.limit]) {
+      if (value !== undefined && typeof value !== 'string') throw httpError(400, 'VALIDATION', 'Invalid query parameters.');
+    }
+    const filter = { role: 'student' };
+    const term = q?.trim().slice(0, 100);
+    if (term) {
+      const pattern = { $regex: esc(term), $options: 'i' };
+      filter.$or = [{ name: pattern }, { email: pattern }, { studentId: pattern }, { course: pattern }];
+    }
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 50);
+    const page = Math.min(Math.max(parseInt(req.query.page, 10) || 1, 1), 10_000);
+    const [users, total] = await Promise.all([
+      User.find(filter).select('name email studentId course semester branch preferredLanguage status createdAt')
+        .sort({ name: 1, _id: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+      User.countDocuments(filter),
+    ]);
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      items: users.map((user) => ({
+        id: String(user._id),
+        name: user.name,
+        email: user.email,
+        studentId: user.studentId ?? null,
+        course: user.course ?? '',
+        semester: user.semester ?? null,
+        branch: user.branch ?? null,
+        preferredLanguage: user.preferredLanguage ?? 'en',
+        status: user.status,
+        createdAt: user.createdAt,
+      })),
+      page,
+      limit,
+      total,
+      pages: Math.max(Math.ceil(total / limit), 1),
+    });
+  }));
+
   r.get('/subjects', wrap(async (_req, res) => {
     const items = await cached('subjects:list', async () =>
       (await Subject.find().sort({ order: 1, name: 1 }).lean()).map((s) => ({ id: String(s._id), name: s.name, slug: s.slug, description: s.description })));

@@ -16,6 +16,8 @@ beforeEach(() => {
     'GET /api/auth/me': () => json(200, { user: ADMIN, csrfToken: 'csrf1' }),
     'GET /api/admin/subjects': () => json(200, { items: [{ id: 's1', name: 'Operating Systems', slug: 'os', description: '' }] }),
     'GET /api/admin/documents?page=1&limit=10': () => json(200, { items: [DOC], page: 1, limit: 10, total: 1, pages: 1 }),
+    'GET /api/admin/students?page=1&limit=10': () => json(200, { items: [{ id: 'u1', name: 'Sam Student', email: 'sam@example.edu', studentId: 'STU-001', course: 'B.Tech IT', semester: 4, branch: 'IT', preferredLanguage: 'en', status: 'active' }], page: 1, limit: 10, total: 1, pages: 1 }),
+    'GET /api/admin/currently-reading': () => json(200, { items: [{ id: 'session1', student: { name: 'Sam Student', email: 'sam@example.edu', course: 'B.Tech IT', semester: 4, branch: 'IT' }, document: { id: 'd1', title: 'OS Notes', subject: 'Operating Systems' }, startedAt: '2026-11-24T11:00:00.000Z', updatedAt: '2026-11-24T11:01:00.000Z' }] }),
     'GET /api/admin/active-users': () => json(200, { count: 0 }),
   };
   globalThis.fetch = vi.fn((url, o = {}) => { const h = routes[`${o.method ?? 'GET'} ${url}`]; return h ? h(o) : json(404, { error: { message: 'nf' } }); });
@@ -23,6 +25,25 @@ beforeEach(() => {
 const at = (p) => render(<ThemeProvider><MemoryRouter initialEntries={[p]}><AuthProvider><App /></AuthProvider></MemoryRouter></ThemeProvider>);
 
 describe('admin documents', () => {
+  it('shows students currently reading notes and refreshes the admin view', async () => {
+    at('/admin/currently-reading');
+    expect(await screen.findByRole('heading', { name: 'Currently reading' })).toBeInTheDocument();
+    expect(await screen.findByText('Sam Student')).toBeInTheDocument();
+    expect(screen.getByText('OS Notes')).toBeInTheDocument();
+    expect(screen.getByText('Operating Systems')).toBeInTheDocument();
+    expect(screen.getByText('Reading')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/admin/currently-reading', expect.objectContaining({ credentials: 'include' }));
+  });
+  it('lets admins browse student academic profiles', async () => {
+    at('/admin/students');
+    expect(await screen.findByRole('heading', { name: 'Students' })).toBeInTheDocument();
+    expect(await screen.findByText('Sam Student')).toBeInTheDocument();
+    expect(screen.getByText('sam@example.edu')).toBeInTheDocument();
+    expect(screen.getByText('STU-001')).toBeInTheDocument();
+    expect(screen.getByText('B.Tech IT')).toBeInTheDocument();
+    expect(screen.getByText('Semester 4 · IT')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/admin/students?page=1&limit=10', expect.objectContaining({ credentials: 'include' }));
+  });
   it('lists documents with text status badges and shows real stats on the dashboard', async () => {
     routes['GET /api/admin/stats'] = () => json(200, { total: 7, published: 3, drafts: 4, inProgress: 0, failed: 0, pdf: 5, image: 2, totalBytes: 2048 });
     routes['GET /api/admin/active-users'] = () => json(200, { count: 3 });

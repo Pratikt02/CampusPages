@@ -15,6 +15,9 @@ import AdminLayout from './features/admin/AdminLayout.jsx';
 import AdminDashboard from './features/admin/pages/AdminDashboard.jsx';
 import AdminUpload from './features/admin/pages/AdminUpload.jsx';
 import AdminDocuments from './features/admin/pages/AdminDocuments.jsx';
+import AdminStudents from './features/admin/pages/AdminStudents.jsx';
+import AdminCurrentlyReading from './features/admin/pages/AdminCurrentlyReading.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import { ProtectedRoute, RoleGuard } from './routes/guards.jsx';
 import Seo from './components/Seo.jsx';
 
@@ -34,6 +37,7 @@ export default function App() {
       <Route path="signup" element={<RegisterPage />} />
       <Route path="unauthorized" element={<UnauthorizedPage />} />
       <Route element={<ProtectedRoute />}>
+        <Route path="profile" element={<ProfilePage />} />
         <Route path="app" element={<StudentLayout />}>
           <Route index element={<StudentDashboard />} />
           <Route path="notes" element={<NotesLibrary />} />
@@ -44,6 +48,8 @@ export default function App() {
             <Route index element={<AdminDashboard />} />
             <Route path="upload" element={<AdminUpload />} />
             <Route path="documents" element={<AdminDocuments />} />
+            <Route path="students" element={<AdminStudents />} />
+            <Route path="currently-reading" element={<AdminCurrentlyReading />} />
           </Route>
         </Route>
       </Route>
