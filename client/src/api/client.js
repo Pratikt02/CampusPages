@@ -9,13 +9,14 @@ export const getCsrfToken = () => csrfToken;
 export const notifyUnauthorized = () => onUnauthorized();
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
-export async function api(path, { method = 'GET', body, signal } = {}) {
+export async function api(path, { method = 'GET', body, signal, keepalive = false } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (method !== 'GET' && csrfToken) headers['X-CSRF-Token'] = csrfToken;
   let res;
   try {
     res = await fetch(`/api${path}`, { method, headers, credentials: 'include', signal,
+      ...(keepalive ? { keepalive: true } : {}),
       body: body === undefined ? undefined : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, 'NETWORK', 'Cannot reach the server. Check your connection and try again.');

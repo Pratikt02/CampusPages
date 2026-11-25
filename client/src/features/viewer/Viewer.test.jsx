@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, createEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ThemeProvider } from '../../components/ThemeProvider.jsx';
 import { AuthProvider } from '../auth/AuthProvider.jsx';
 
@@ -16,6 +16,7 @@ const json = (status, body) => Promise.resolve({ ok: status < 400, status, json:
 const STUDENT = { id: '1', name: 'Sam', email: 'student@example.edu', role: 'student' };
 const META = { id: 'd1', title: 'OS Notes', description: '', subject: { id: 's', name: 'OS' }, semester: null, fileType: 'pdf', pageCount: 3, width: null, height: null, fileSize: 5000, createdAt: '2026-01-01T00:00:00Z' };
 let routes; let content;
+const documentHiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
 beforeEach(() => {
   openPdf.mockReset(); notifyUnauthorized.mockReset(); globalThis.__viewport = { width: 800, height: 600 };
   content = vi.fn();
@@ -32,6 +33,10 @@ beforeEach(() => {
     const h = routes[`${o.method ?? 'GET'} ${url.split('?')[0]}`]; return h ? h(o) : json(404, { error: { message: 'nf' } });
   });
 });
+afterEach(() => {
+  if (documentHiddenDescriptor) Object.defineProperty(document, 'hidden', documentHiddenDescriptor);
+});
+const setDocumentHidden = (hidden) => Object.defineProperty(document, 'hidden', { configurable: true, value: hidden });
 const imgResponse = (type = 'image/png', status = 200) => Promise.resolve(status === 200 ? new Response('x', { status, headers: { 'Content-Type': type } }) : new Response('', { status }));
 const at = (path) => render(<ThemeProvider><MemoryRouter initialEntries={[path]}><AuthProvider><App /></AuthProvider></MemoryRouter></ThemeProvider>);
 const loadImage = async (w = 2000, h = 1000) => {
@@ -61,8 +66,10 @@ describe('ImageViewer', () => {
     content.mockImplementation(() => imgResponse()); mountImage(); await loadImage(2000, 1000);
     await waitFor(() => expect(zoom()).toHaveTextContent('39%'));      // min((800-16)/2000 = 0.392, (600-16)/1000)
     await userEvent.click(screen.getByRole('button', { name: 'Zoom in' })); expect(zoom()).toHaveTextContent('50%');
+    expect(document.querySelector('.zoom-magnifier')).toHaveClass('zoom-magnifier--in');
     await userEvent.click(screen.getByRole('button', { name: 'Actual size' })); expect(zoom()).toHaveTextContent('100%');
     await userEvent.click(screen.getByRole('button', { name: 'Zoom out' })); expect(zoom()).toHaveTextContent('75%');
+    expect(document.querySelector('.zoom-magnifier')).toHaveClass('zoom-magnifier--out');
     await userEvent.click(screen.getByRole('button', { name: 'Fit to view' })); expect(zoom()).toHaveTextContent('39%');
     expect(screen.getByRole('button', { name: 'Fit to view' })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -143,6 +150,54 @@ describe('ViewerPage', () => {
     } finally {
       intervalSpy.mockRestore();
       clearIntervalSpy.mockRestore();
+    }
+  });
+  it('pauses reading presence when hidden and resumes it when visible', async () => {
+    fakePdf();
+    const intervalSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
+    const { unmount } = at('/app/documents/d1');
+    try {
+      await screen.findByRole('toolbar', { name: /document controls/i });
+      await waitFor(() => expect(fetch.mock.calls.filter(([url, options]) => url === '/api/auth/reading' && options.method === 'POST')).toHaveLength(1));
+      const interval = intervalSpy.mock.calls.find(([, delay]) => delay === 60_000);
+      expect(interval).toBeDefined();
+
+      setDocumentHidden(true);
+      fireEvent(document, new Event('visibilitychange'));
+      await waitFor(() => expect(fetch.mock.calls.some(([url, options]) => url.startsWith('/api/auth/reading/d1/')
+        && options.method === 'DELETE' && options.keepalive === true)).toBe(true));
+      expect(clearIntervalSpy).toHaveBeenCalledWith(intervalSpy.mock.results[intervalSpy.mock.calls.indexOf(interval)].value);
+
+      interval[0]();
+      expect(fetch.mock.calls.filter(([url, options]) => url === '/api/auth/reading' && options.method === 'POST')).toHaveLength(1);
+
+      setDocumentHidden(false);
+      fireEvent(document, new Event('visibilitychange'));
+      await waitFor(() => expect(fetch.mock.calls.filter(([url, options]) => url === '/api/auth/reading' && options.method === 'POST')).toHaveLength(2));
+
+      fireEvent(window, new Event('pagehide'));
+      await waitFor(() => expect(fetch.mock.calls.filter(([url, options]) => url.startsWith('/api/auth/reading/d1/')
+        && options.method === 'DELETE' && options.keepalive === true)).toHaveLength(2));
+    } finally {
+      unmount();
+      intervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
+    }
+  });
+  it('does not activate reading while the tab is initially hidden', async () => {
+    setDocumentHidden(true);
+    fakePdf();
+    const { unmount } = at('/app/documents/d1');
+    try {
+      await screen.findByRole('toolbar', { name: /document controls/i });
+      expect(fetch.mock.calls.some(([url, options]) => url === '/api/auth/reading' && options.method === 'POST')).toBe(false);
+
+      setDocumentHidden(false);
+      fireEvent(document, new Event('visibilitychange'));
+      await waitFor(() => expect(fetch.mock.calls.some(([url, options]) => url === '/api/auth/reading' && options.method === 'POST')).toBe(true));
+    } finally {
+      unmount();
     }
   });
   it('does not render a watermark even when identity-like query parameters are present', async () => {

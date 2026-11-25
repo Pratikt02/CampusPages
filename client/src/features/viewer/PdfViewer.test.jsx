@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, createEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, createEvent, waitFor, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -26,6 +26,49 @@ beforeEach(() => {
 });
 
 describe('PdfViewer', () => {
+  it('keeps zoom steps intact and restarts the centered magnifier on rapid zoom clicks', async () => {
+    load(3); mount(); await ready();
+    const scrollViewport = document.querySelector('.viewer-scroll');
+    vi.spyOn(scrollViewport, 'getBoundingClientRect').mockReturnValue({
+      left: 20, top: 100, right: 720, bottom: 600, width: 700, height: 500,
+    });
+    vi.useFakeTimers();
+    try {
+      const zoom = () => screen.getByLabelText('Zoom level');
+      const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+      fireEvent.click(zoomIn);
+      expect(zoom()).toHaveTextContent('75%');
+      const firstAnimation = document.querySelector('.zoom-magnifier');
+      expect(firstAnimation).toHaveClass('zoom-magnifier--in');
+      const lens = firstAnimation.querySelector('radialGradient[id$="-glossyBlueLens"]');
+      expect(Number(lens.querySelector('stop').getAttribute('stop-opacity'))).toBeCloseTo(0.48);
+      expect(lens.querySelector('stop:last-child')).toHaveAttribute('stop-color', '#0F172A');
+      expect(Number(lens.querySelector('stop:last-child').getAttribute('stop-opacity'))).toBeCloseTo(0.78);
+      const overlay = document.querySelector('.zoom-magnifier-overlay');
+      expect(overlay.style.left).toBe('20px');
+      expect(overlay.style.top).toBe('100px');
+      expect(overlay.style.width).toBe('700px');
+      expect(overlay.style.height).toBe('500px');
+
+      fireEvent.click(zoomIn);
+      expect(zoom()).toHaveTextContent('100%');
+      const restartedAnimation = document.querySelector('.zoom-magnifier');
+      expect(restartedAnimation).not.toBe(firstAnimation);
+      expect(restartedAnimation).toHaveClass('zoom-magnifier--in');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Zoom out' }));
+      expect(zoom()).toHaveTextContent('75%');
+      expect(document.querySelector('.zoom-magnifier')).toHaveClass('zoom-magnifier--out');
+
+      act(() => vi.advanceTimersByTime(649));
+      expect(document.querySelector('.zoom-magnifier')).toBeInTheDocument();
+      act(() => vi.advanceTimersByTime(1));
+      expect(document.querySelector('.zoom-magnifier')).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('shows loading, opens through the authorized range loader with the known length, and has no download/print controls', async () => {
     load(5); mount();
     expect(screen.getByRole('status')).toHaveTextContent(/loading document/i);

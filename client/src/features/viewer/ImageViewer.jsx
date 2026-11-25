@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Maximize2, RefreshCw, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 import { AnnotationLayer } from './AnnotationLayer.jsx';
 import { AnnotationToolbar } from './AnnotationToolbar.jsx';
+import { ZoomMagnifierOverlay } from './ZoomMagnifierOverlay.jsx';
 import { clampPan, contentUrl, fitPageScale, nextZoom, zoomAround, MAX_ZOOM, MIN_ZOOM } from './viewMath.js';
 import { notifyUnauthorized } from '../../api/client.js';
 
@@ -14,6 +15,7 @@ export default function ImageViewer({ docId, title, annotations = { pages: {}, s
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 }); const [fit, setFit] = useState(true);
   const [tool, setTool] = useState('pan'); const [color, setColor] = useState('#2563eb'); const [strokeWidth, setStrokeWidth] = useState(0.006);
+  const [zoomPulse, setZoomPulse] = useState(null); const zoomPulseId = useRef(0);
   const stage = useRef(null); const pointers = useRef(new Map()); const gesture = useRef(null);
 
   useEffect(() => { // fetch with the session cookie; an object URL keeps the bytes in memory only (never a public URL)
@@ -42,6 +44,7 @@ export default function ImageViewer({ docId, title, annotations = { pages: {}, s
   const pos = nat ? (fit ? { x: 0, y: 0 } : clampPan(view.x, view.y, nat.w * scale, nat.h * scale, size.w, size.h)) : { x: 0, y: 0 };
   const apply = (next) => { setFit(false); setView({ scale: next.scale, ...clampPan(next.x, next.y, nat.w * next.scale, nat.h * next.scale, size.w, size.h) }); };
   const zoomTo = (s, cx = 0, cy = 0) => nat && apply(zoomAround({ scale, ...pos }, s, cx, cy));
+  const triggerZoomPulse = (direction) => setZoomPulse({ direction, id: ++zoomPulseId.current });
   const rel = (e) => { const r = stage.current.getBoundingClientRect(); return { x: e.clientX - r.left - r.width / 2, y: e.clientY - r.top - r.height / 2 }; };
   const finite = (p) => Number.isFinite(p.x) && Number.isFinite(p.y); // never let a bad coordinate poison the view state
 
@@ -83,9 +86,9 @@ export default function ImageViewer({ docId, title, annotations = { pages: {}, s
     <section className="viewer" aria-label={`Reader: ${title}`}>
       <div className="viewer-toolbar" role="toolbar" aria-label="Image controls">
         <div className="tool-group">
-          <button type="button" className="btn icon-btn" aria-label="Zoom out" onClick={() => zoomTo(nextZoom(scale, -1))} disabled={!nat || scale <= MIN_ZOOM + 0.001}><ZoomOut size={20} aria-hidden="true" /></button>
+          <button type="button" className="btn icon-btn" aria-label="Zoom out" onClick={() => { zoomTo(nextZoom(scale, -1)); triggerZoomPulse('out'); }} disabled={!nat || scale <= MIN_ZOOM + 0.001}><ZoomOut size={20} aria-hidden="true" /></button>
           <output className="zoom-label" aria-label="Zoom level">{Math.round(scale * 100)}%</output>
-          <button type="button" className="btn icon-btn" aria-label="Zoom in" onClick={() => zoomTo(nextZoom(scale, +1))} disabled={!nat || scale >= MAX_ZOOM - 0.001}><ZoomIn size={20} aria-hidden="true" /></button>
+          <button type="button" className="btn icon-btn" aria-label="Zoom in" onClick={() => { zoomTo(nextZoom(scale, +1)); triggerZoomPulse('in'); }} disabled={!nat || scale >= MAX_ZOOM - 0.001}><ZoomIn size={20} aria-hidden="true" /></button>
           <button type="button" className="btn icon-btn" aria-label="Fit to view" aria-pressed={fit} onClick={() => setFit(true)} disabled={!nat}><Maximize2 size={20} aria-hidden="true" /></button>
           <button type="button" className="btn icon-btn" aria-label="Actual size" onClick={() => zoomTo(1)} disabled={!nat}><RotateCcw size={20} aria-hidden="true" /></button>
         </div>
@@ -105,6 +108,7 @@ export default function ImageViewer({ docId, title, annotations = { pages: {}, s
           style={{ position: 'absolute', left: '50%', top: '50%', width: nat.w, height: nat.h,
             transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${scale})` }} />}
       </div>
+      <ZoomMagnifierOverlay trigger={zoomPulse} viewportRef={stage} />
     </section>
   );
 }

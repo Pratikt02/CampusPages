@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 
 const pointDistance = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const HIGHLIGHTER_COLOR = '#39ff14';
 
 function strokePath(stroke, width, height) {
   return stroke.points.map(({ x, y }) => `${x * width},${y * height}`).join(' ');
@@ -33,7 +34,7 @@ export function AnnotationLayer({ page, width, height, strokes = [], tool, color
     event.currentTarget.setPointerCapture?.(event.pointerId);
     const newStroke = {
       tool,
-      color: tool === 'highlighter' ? '#facc15' : color,
+      color: tool === 'highlighter' ? HIGHLIGHTER_COLOR : color,
       width: tool === 'highlighter' ? Math.max(strokeWidth, 0.012) : strokeWidth,
       points: [point],
     };

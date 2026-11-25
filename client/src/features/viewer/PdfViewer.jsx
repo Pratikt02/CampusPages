@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Maximize2, Minimize2, MoveHorizontal, Refres
 import { openPdf, isRenderCancelled } from './pdfjs.js';
 import { AnnotationLayer } from './AnnotationLayer.jsx';
 import { AnnotationToolbar } from './AnnotationToolbar.jsx';
+import { ZoomMagnifierOverlay } from './ZoomMagnifierOverlay.jsx';
 import { clamp, contentUrl, fitPageScale, fitWidthScale, nextZoom, outputScaleFor } from './viewMath.js';
 import { notifyUnauthorized } from '../../api/client.js';
 
@@ -65,6 +66,7 @@ export default function PdfViewer({ docId, title, size: fileSize, annotations = 
   const [outputDpr, setOutputDpr] = useState(() => (window.devicePixelRatio || 1) * (window.visualViewport?.scale || 1));
   const [current, setCurrent] = useState(1); const [pageInput, setPageInput] = useState('1');
   const [tool, setTool] = useState('pan'); const [color, setColor] = useState('#2563eb'); const [strokeWidth, setStrokeWidth] = useState(0.006);
+  const [zoomPulse, setZoomPulse] = useState(null); const zoomPulseId = useRef(0);
   const scroller = useRef(null); const els = useRef(new Map()); const raf = useRef(0);
   const registerEl = useCallback((n, el) => { if (el) els.current.set(n, el); else els.current.delete(n); }, []);
 
@@ -114,6 +116,7 @@ export default function PdfViewer({ docId, title, size: fileSize, annotations = 
   const base = state.base ?? { w: 1, h: 1 };
   const scale = mode === 'custom' ? custom : mode === 'page' ? fitPageScale(size.w, size.h, base.w, base.h) : fitWidthScale(size.w, base.w);
   const total = state.pdf?.numPages ?? 0;
+  const triggerZoomPulse = (direction) => setZoomPulse({ direction, id: ++zoomPulseId.current });
 
   const goTo = (n) => {
     const t = clamp(Math.round(n) || 1, 1, Math.max(total, 1)); const el = els.current.get(t);
@@ -158,9 +161,9 @@ export default function PdfViewer({ docId, title, size: fileSize, annotations = 
           <button type="button" className="btn icon-btn" aria-label="Next page" onClick={() => goTo(current + 1)} disabled={current >= total}><ChevronRight size={20} aria-hidden="true" /></button>
         </div>
         <div className="tool-group">
-          <button type="button" className="btn icon-btn" aria-label="Zoom out" onClick={() => zoom(-1)} disabled={scale <= 0.25 + 0.001}><ZoomOut size={20} aria-hidden="true" /></button>
+          <button type="button" className="btn icon-btn" aria-label="Zoom out" onClick={() => { zoom(-1); triggerZoomPulse('out'); }} disabled={scale <= 0.25 + 0.001}><ZoomOut size={20} aria-hidden="true" /></button>
           <output className="zoom-label" aria-label="Zoom level">{Math.round(scale * 100)}%</output>
-          <button type="button" className="btn icon-btn" aria-label="Zoom in" onClick={() => zoom(+1)} disabled={scale >= 4 - 0.001}><ZoomIn size={20} aria-hidden="true" /></button>
+          <button type="button" className="btn icon-btn" aria-label="Zoom in" onClick={() => { zoom(+1); triggerZoomPulse('in'); }} disabled={scale >= 4 - 0.001}><ZoomIn size={20} aria-hidden="true" /></button>
           <button type="button" className="btn icon-btn" aria-label="Fit to width" aria-pressed={mode === 'width'} onClick={() => setMode('width')}><MoveHorizontal size={20} aria-hidden="true" /></button>
           <button type="button" className="btn icon-btn" aria-label="Fit to page" aria-pressed={mode === 'page'} onClick={() => setMode('page')}><Maximize2 size={20} aria-hidden="true" /></button>
           <button
@@ -178,6 +181,7 @@ export default function PdfViewer({ docId, title, size: fileSize, annotations = 
       <AnnotationToolbar tool={tool} setTool={setTool} color={color} setColor={setColor} strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
         strokes={annotations.pages[current] ?? []} onUndo={() => annotations.savePage(current, (annotations.pages[current] ?? []).slice(0, -1))}
         onClear={() => annotations.savePage(current, [])} status={annotations.status} />
+      <ZoomMagnifierOverlay trigger={zoomPulse} viewportRef={scroller} />
       {/* Context-menu blocking is a casual-copying deterrent only, not a security boundary. */}
       <div ref={scroller} className="viewer-scroll" tabIndex={0} onScroll={onScroll} onKeyDown={onKey} onContextMenu={(e) => e.preventDefault()} aria-label="Document pages. Use plus and minus to zoom, 0 to fit width.">
         <div className="pdf-pages">

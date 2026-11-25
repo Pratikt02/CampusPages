@@ -37,22 +37,62 @@ export default function ViewerPage() {
   useEffect(() => {
     if (!data || data.id !== id) return undefined;
     let mounted = true;
+    let active = false;
+    let interval = null;
+    let inFlightHeartbeats = 0;
+    let stopAfterHeartbeats = false;
     const readingToken = globalThis.crypto.randomUUID();
+    const stopRequest = () => {
+      api(`/auth/reading/${encodeURIComponent(data.id)}/${encodeURIComponent(readingToken)}`, {
+        method: 'DELETE',
+        keepalive: true,
+      }).catch((e) => {
+        if (mounted && e.name !== 'AbortError') setReadingError(true);
+      });
+    };
     const heartbeat = async () => {
+      if (!mounted || !active || document.hidden) return;
+      inFlightHeartbeats += 1;
       try {
         await api('/auth/reading', { method: 'POST', body: { documentId: data.id, readingToken } });
         if (mounted) setReadingError(false);
       } catch (e) {
         if (mounted && e.status !== 401) setReadingError(true);
+      } finally {
+        inFlightHeartbeats -= 1;
+        if (inFlightHeartbeats === 0 && stopAfterHeartbeats) {
+          stopAfterHeartbeats = false;
+          if (!active || document.hidden) stopRequest();
+        }
       }
     };
-    heartbeat();
-    const interval = setInterval(heartbeat, 60_000);
+    const stopReading = () => {
+      if (!active) return;
+      active = false;
+      if (interval !== null) clearInterval(interval);
+      interval = null;
+      stopAfterHeartbeats = inFlightHeartbeats > 0;
+      stopRequest();
+    };
+    const startReading = () => {
+      if (!mounted || document.hidden || active) return;
+      active = true;
+      heartbeat();
+      interval = setInterval(heartbeat, 60_000);
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) stopReading();
+      else startReading();
+    };
+    const onPageHide = () => stopReading();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('pagehide', onPageHide);
+    startReading();
     return () => {
       mounted = false;
-      clearInterval(interval);
-      api(`/auth/reading/${encodeURIComponent(data.id)}/${encodeURIComponent(readingToken)}`, { method: 'DELETE' })
-        .catch((e) => { if (e.name !== 'AbortError') setReadingError(true); });
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('pagehide', onPageHide);
+      stopReading();
     };
   }, [data, id]);
   const Viewer = data?.fileType === 'image' ? ImageViewer : PdfViewer;
