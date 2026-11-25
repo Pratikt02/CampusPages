@@ -11,7 +11,7 @@ import { useAuth } from '../features/auth/AuthProvider.jsx';
 
 const FEATURES = [
   [Layers, 'Organized study materials', 'Notes grouped by subject so you can find the right document instantly.', '/images/feature-organized.jpg', 'Rows of books organized on library shelves'],
-  [FileText, 'Protected PDF & image reader', 'Read approved documents in the browser with precise zoom and secure watermarking.', '/images/feature-reading.jpg', 'An open book ready for a focused reading session'],
+  [FileText, 'PDF & image reader', 'Read approved documents in the browser, then annotate with pencil, highlights, and tick marks.', '/images/feature-reading.jpg', 'An open book ready for a focused reading session'],
   [Search, 'Instant search & filtering', 'Narrow your library effortlessly by subject and keyword.', '/images/feature-search.jpg', 'A laptop displaying a digital workspace'],
   [Smartphone, 'Study Anytime, Anywhere', 'Access available learning materials across desktop, tablet, and mobile devices.', '/images/feature-anywhere.jpg', 'A smartphone beside a laptop for studying on the go'],
   [Sparkles, 'A Distraction-Free Reading Experience', 'Read study documents in a dedicated interface designed to keep your focus on learning.', '/images/feature-workspace.jpg', 'A quiet aisle in a university library'],

@@ -42,7 +42,7 @@ Cloudinary adapter slices the stream itself and stops reading upstream early (co
   All caps are per process: N API instances allow N times the global cap.
 
 ## Honest limitations
-- Delivered bytes cannot be revoked or hidden: a signed-in student can save, screenshot or photograph what they can view. Watermarks (Phase 6) deter, they do not prevent.
+- Delivered bytes cannot be revoked or hidden: a signed-in student can save, screenshot or photograph what they can view.
 - Revocation takes effect on the next request; an in-flight stream finishes (bounded by the stream timeout).
 - Admins cannot preview *drafts* through this route (published + ready only).
 - If the frontend and API run on different origins, `Cross-Origin-Resource-Policy: same-origin` (Helmet default) would block `<img src>` loads; Phase 6 loads images with `fetch` or the topology is chosen in Phase 8.

@@ -77,7 +77,7 @@ export default function ProfilePage() {
       <header className="nav"><div className="container nav-inner">
         <BrandLogo to={user?.role === 'admin' ? '/admin' : '/app'} />
         <nav aria-label="Account" className="student-nav"><Link to="/app">Library</Link><Link to="/profile">Profile</Link></nav>
-        <div className="nav-actions"><ThemeToggle /><button type="button" className="btn" onClick={logout}>Sign out</button></div>
+        <div className="nav-actions"><ThemeToggle /><button type="button" className="btn btn-danger" onClick={logout}>Sign out</button></div>
       </div></header>
       <main id="main" className="container section profile-page">
         <section className="profile-hero" aria-label="Profile summary">

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampPan, fitPageScale, fitWidthScale, maskEmail, nextZoom, outputScaleFor, zoomAround, MAX_ZOOM, MIN_ZOOM, formatStamp } from './viewMath.js';
+import { clampPan, fitPageScale, fitWidthScale, nextZoom, outputScaleFor, zoomAround, MAX_ZOOM, MIN_ZOOM } from './viewMath.js';
 
 describe('zoom and fit', () => {
   it('steps through presets and stops at the limits', () => {
@@ -37,14 +37,4 @@ describe('pan and zoom-at-point', () => {
     expect(z).toEqual({ scale: 2, x: -100, y: -50 });
     expect(zoomAround(v, 99, 0, 0).scale).toBe(MAX_ZOOM);
   });
-});
-describe('watermark identity helpers', () => {
-  it('masks emails without exposing the full address', () => {
-    expect(maskEmail('student@example.edu')).toBe('s*****t@example.edu');
-    expect(maskEmail('ab@x.org')).toBe('a*@x.org');
-    expect(maskEmail('a@x.org')).toBe('a*@x.org');
-    expect(maskEmail('')).toBe('signed-in user'); expect(maskEmail(undefined)).toBe('signed-in user'); expect(maskEmail('no-at-sign')).toBe('signed-in user');
-    expect(maskEmail('student@example.edu')).not.toContain('tudent');
-  });
-  it('formats a stable timestamp', () => { expect(formatStamp(new Date(2026, 0, 5, 9, 7))).toBe('2026-01-05 09:07'); });
 });

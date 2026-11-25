@@ -30,7 +30,6 @@ Executed at the end of Phase 8: server tests **140 passed**, client tests **146 
 | Failed uploads never become accessible | Met | T. |
 | Students read published PDFs and approved images | Met in Firefox with in-memory storage; **U with real Cloudinary** | B: PDF.js drew pixels at all 7 viewports (lazy: 1-4 of 12 pages at a time), image reader fits and zooms. |
 | Responsive viewer controls | Met for layout; **real touch gestures U** | B, T. |
-| Watermark uses authenticated identity (never URL parameters) | Met | T (hostile query parameters ignored), B (visual). |
 | No download/print buttons; extraction limits stated | Met | T; `docs/SECURITY.md` risk 1. |
 
 ## Design and responsiveness
@@ -38,7 +37,7 @@ Executed at the end of Phase 8: server tests **140 passed**, client tests **146 
 |---|---|---|
 | Light and dark themes across the whole app | Met | B (all pages, both themes), T (49 contrast checks from the real token file). Deviation: filled buttons in dark mode use #4F46E5 (your #6366F1 gave 4.0:1 text contrast); #6366F1 remains the accent. |
 | Public, student, admin, auth and viewer screens responsive; specified viewports tested | Met in Firefox | B at 320x568, 390x844, 844x390, 768x1024, 1024x768, 1366x768, 1920x1080. 320 and 390 were rendered in an iframe of that width because Firefox will not shrink a window below ~500 px. Chrome, Safari, real phones/tablets **U**. |
-| No unresolved critical overflow/overlap/clipping/navigation/accessibility issue | Met for what was tested | Several real defects were found and fixed (mobile navbar pushing the menu off-screen, image fit cropping, watermark clipping, admin table on phones, tap targets, heading order, dark-mode contrast). Final runs: 0 overflow, 0 sub-44 px targets at phone widths. |
+| No unresolved critical overflow/overlap/clipping/navigation/accessibility issue | Met for what was tested | Several real defects were found and fixed (mobile navbar pushing the menu off-screen, image fit cropping, admin table on phones, tap targets, heading order, dark-mode contrast). Final runs: 0 overflow, 0 sub-44 px targets at phone widths. |
 | All buttons and links perform their advertised actions | **Partly** | The primary flows are tested; there was no exhaustive click-through of every control. |
 | Loading, empty, error and success states | Met | T. |
 | Accessibility | Partly | axe-core on every major screen and dialog (T), keyboard order, focus visibility, modal trap, Escape (B). **Screen readers U.** PDF pages have no text layer (see limitations). |

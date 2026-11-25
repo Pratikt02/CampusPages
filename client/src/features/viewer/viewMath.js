@@ -34,12 +34,4 @@ export function zoomAround(view, nextScale, cx, cy) {
   return { scale: s, x: cx - (cx - view.x) * k, y: cy - (cy - view.y) * k };
 }
 
-// "student@example.edu" -> "s*****t@example.edu": identifies the viewer without printing the full address.
-export function maskEmail(email) {
-  const [local = '', domain = ''] = String(email ?? '').split('@');
-  if (!domain) return 'signed-in user';
-  const head = local.slice(0, 1), tail = local.length > 2 ? local.slice(-1) : '';
-  return `${head}${'*'.repeat(Math.max(Math.min(local.length - head.length - tail.length, 6), 1))}${tail}@${domain}`;
-}
-export const formatStamp = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 export const contentUrl = (id) => `/api/documents/${encodeURIComponent(id)}/content`;

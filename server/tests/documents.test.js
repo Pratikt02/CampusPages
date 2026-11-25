@@ -13,6 +13,7 @@ import { User } from '../src/models/User.js';
 import { Session } from '../src/models/Session.js';
 import { Subject } from '../src/models/Subject.js';
 import { Document } from '../src/models/Document.js';
+import { Annotation } from '../src/models/Annotation.js';
 import { hashPassword } from '../src/services/password.js';
 
 const ORIGIN = 'http://localhost:5173';
@@ -42,12 +43,12 @@ const upload = (s, o) => uploadReq(s, o);
 beforeAll(async () => {
   mongod = await MongoMemoryServer.create();
   await mongoose.connect(mongod.getUri());
-  await Promise.all([User, Session, Subject, Document].map((m) => m.syncIndexes()));
+  await Promise.all([User, Session, Subject, Document, Annotation].map((m) => m.syncIndexes()));
 });
 afterAll(async () => { await mongoose.disconnect(); await mongod.stop(); });
 let adminS, studentS;
 beforeEach(async () => {
-  await Promise.all([User, Session, Subject, Document].map((m) => m.deleteMany({}))); flushAll();
+  await Promise.all([User, Session, Subject, Document, Annotation].map((m) => m.deleteMany({}))); flushAll();
   storage = createMemoryStorage();
   app = createApp(loadConfig(env), { storage });
   const passwordHash = await hashPassword(PW);
@@ -126,6 +127,39 @@ describe('upload validation', () => {
     const doc = await Document.findById(res.body.id).select('+objectKey');
     expect(doc.objectKey).toMatch(new RegExp(`^campuspages/documents/${doc.id}/[0-9a-f]{24}\\.pdf$`));
     expect(storage.objects.has(doc.objectKey)).toBe(true);
+  });
+
+  describe('personal annotations', () => {
+    it('saves annotations per user and page, and extends expiry to 15 days after each save', async () => {
+      const doc = await upload(adminS, { buf: await pdf(2), fields: { publish: 'true' } });
+      const url = `/api/documents/${doc.body.id}/annotations`;
+      const strokes = [{ tool: 'pencil', color: '#2563eb', width: 0.006, points: [{ x: 0.2, y: 0.3 }, { x: 0.4, y: 0.5 }] }];
+
+      const saved = await send(studentS, 'put', `${url}/1`).send({ strokes });
+      expect(saved.status).toBe(200);
+      expect(saved.body.saved).toBe(true);
+      const record = await Annotation.findOne({ user: student._id, document: doc.body.id, page: 1 });
+      expect(record.strokes).toMatchObject(strokes);
+      expect(record.expiresAt.getTime()).toBeGreaterThan(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      expect(record.expiresAt.getTime()).toBeLessThan(Date.now() + 16 * 24 * 60 * 60 * 1000);
+
+      const loaded = await studentS.agent.get(url);
+      expect(loaded.status).toBe(200);
+      expect(loaded.body.items).toMatchObject([{ page: 1, strokes }]);
+      expect((await adminS.agent.get(url)).body.items).toEqual([]);
+      expect((await send(studentS, 'put', `${url}/2`).send({ strokes: [] })).status).toBe(204);
+    });
+
+    it('rejects invalid pages and coordinates, requires authentication, and hides private materials', async () => {
+      const doc = await upload(adminS, { buf: await pdf(1), fields: { publish: 'true' } });
+      const url = `/api/documents/${doc.body.id}/annotations`;
+      expect((await request(app).get(url)).status).toBe(401);
+      expect((await send(studentS, 'put', `${url}/2`).send({ strokes: [] })).status).toBe(400);
+      expect((await send(studentS, 'put', `${url}/1`).send({ strokes: [{ tool: 'pencil', color: '#123456', width: 0.01, points: [{ x: 2, y: 0 }] }] })).status).toBe(400);
+
+      const draft = await upload(adminS, { buf: await pdf() });
+      expect((await send(studentS, 'put', `/api/documents/${draft.body.id}/annotations/1`).send({ strokes: [] })).status).toBe(404);
+    });
   });
   it('accepts JPEG, PNG and WebP with dimensions', async () => {
     for (const [buf, name, mime, w, h] of [[await png(), 'a.png', 'image/png', 40, 30], [await jpg(), 'a.jpg', 'image/jpeg', 20, 10], [await webp(), 'a.webp', 'image/webp', 20, 10]]) {

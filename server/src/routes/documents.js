@@ -2,6 +2,7 @@ import { pipeline } from 'node:stream';
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { Document } from '../models/Document.js';
+import { Annotation } from '../models/Annotation.js';
 import { Subject } from '../models/Subject.js';
 import { requireAuth, httpError } from '../middleware/auth.js';
 import { isObjectId } from '../documents/validation.js';
@@ -14,6 +15,8 @@ import { log } from '../utils/logger.js';
 
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const ANNOTATION_TTL_MS = 15 * 24 * 60 * 60 * 1000;
+const ANNOTATION_TOOLS = new Set(['pencil', 'highlighter', 'tick']);
 // Allow-listed student-facing fields. No objectKey, mimeType, uploader, or processing/publication internals.
 const FIELDS = 'title description subject semester academicCategory academicYear branch standard course materialType fileType pageCount width height fileSize createdAt';
 const dto = (d) => ({
@@ -77,6 +80,54 @@ export function documentsRouter(config, { storage } = {}) {
       Document.distinct('course', { ...VISIBLE, academicCategory: 'other', course: { $type: 'string', $ne: '' } }),
     ]);
     res.json({ standards: standards.sort((a, b) => a.localeCompare(b)), courses: courses.sort((a, b) => a.localeCompare(b)) });
+  }));
+
+  r.get('/:id/annotations', wrap(async (req, res) => {
+    const doc = isObjectId(req.params.id)
+      ? await Document.findOne({ _id: req.params.id, ...VISIBLE }).select('_id').lean() : null;
+    if (!doc) throw httpError(404, 'NOT_FOUND', 'Document not found.');
+    const items = await Annotation.find({
+      user: req.auth.user._id, document: doc._id, expiresAt: { $gt: new Date() },
+    }).select('page strokes expiresAt').lean();
+    res.json({ items: items.map(({ page, strokes, expiresAt }) => ({ page, strokes, expiresAt })) });
+  }));
+
+  r.put('/:id/annotations/:page', wrap(async (req, res) => {
+    const doc = isObjectId(req.params.id)
+      ? await Document.findOne({ _id: req.params.id, ...VISIBLE }).select('_id fileType pageCount').lean() : null;
+    if (!doc) throw httpError(404, 'NOT_FOUND', 'Document not found.');
+    const page = Number(req.params.page);
+    const pageCount = doc.fileType === 'image' ? 1 : (doc.pageCount ?? 1);
+    if (!Number.isSafeInteger(page) || page < 1 || page > pageCount) {
+      throw httpError(400, 'VALIDATION', 'Invalid page number.');
+    }
+
+    const body = req.body;
+    if (!body || Object.keys(body).some((key) => key !== 'strokes') || !Array.isArray(body.strokes) || body.strokes.length > 500) {
+      throw httpError(400, 'VALIDATION', 'Invalid annotation data.');
+    }
+    const validStroke = (stroke) => {
+      if (!stroke || Object.keys(stroke).some((key) => !['tool', 'color', 'width', 'points'].includes(key))) return false;
+      if (!ANNOTATION_TOOLS.has(stroke.tool) || typeof stroke.color !== 'string' || !/^#[0-9a-f]{6}$/i.test(stroke.color)) return false;
+      if (typeof stroke.width !== 'number' || !Number.isFinite(stroke.width) || stroke.width < 0.001 || stroke.width > 0.04) return false;
+      if (!Array.isArray(stroke.points) || stroke.points.length < (stroke.tool === 'tick' ? 3 : 1) || stroke.points.length > 1000) return false;
+      return stroke.points.every((point) => point && Object.keys(point).every((key) => key === 'x' || key === 'y') &&
+        typeof point.x === 'number' && Number.isFinite(point.x) && point.x >= 0 && point.x <= 1 &&
+        typeof point.y === 'number' && Number.isFinite(point.y) && point.y >= 0 && point.y <= 1);
+    };
+    if (!body.strokes.every(validStroke)) throw httpError(400, 'VALIDATION', 'Invalid annotation data.');
+
+    const filter = { user: req.auth.user._id, document: doc._id, page };
+    if (!body.strokes.length) {
+      await Annotation.deleteOne(filter);
+      return res.status(204).end();
+    }
+    const now = new Date();
+    await Annotation.findOneAndUpdate(filter, {
+      $set: { strokes: body.strokes, expiresAt: new Date(+now + ANNOTATION_TTL_MS) },
+      $setOnInsert: filter,
+    }, { upsert: true, new: true, runValidators: true });
+    res.json({ saved: true, expiresAt: new Date(+now + ANNOTATION_TTL_MS) });
   }));
 
   // PROTECTED CONTENT. Every request (including each PDF.js range request) is authorized against CURRENT DB state:

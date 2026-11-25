@@ -1,17 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { Maximize2, RefreshCw, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
-import { WatermarkOverlay } from './WatermarkOverlay.jsx';
+import { AnnotationLayer } from './AnnotationLayer.jsx';
+import { AnnotationToolbar } from './AnnotationToolbar.jsx';
 import { clampPan, contentUrl, fitPageScale, nextZoom, zoomAround, MAX_ZOOM, MIN_ZOOM } from './viewMath.js';
 import { notifyUnauthorized } from '../../api/client.js';
 
 const errorText = (s) => (s === 401 ? 'Your session has expired. Please sign in again.' : s === 404 ? 'This document is no longer available.' : 'The image could not be loaded.');
 
-export default function ImageViewer({ docId, title, identity }) {
+export default function ImageViewer({ docId, title, annotations = { pages: {}, status: 'ready', savePage: () => {} } }) {
   const [state, setState] = useState({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [nat, setNat] = useState(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState({ scale: 1, x: 0, y: 0 }); const [fit, setFit] = useState(true);
+  const [tool, setTool] = useState('pan'); const [color, setColor] = useState('#2563eb'); const [strokeWidth, setStrokeWidth] = useState(0.006);
   const stage = useRef(null); const pointers = useRef(new Map()); const gesture = useRef(null);
 
   useEffect(() => { // fetch with the session cookie; an object URL keeps the bytes in memory only (never a public URL)
@@ -49,9 +51,9 @@ export default function ImageViewer({ docId, title, identity }) {
     el.addEventListener('wheel', onWheel, { passive: false }); return () => el.removeEventListener('wheel', onWheel);
   });
 
-  const onDown = (e) => { const p = rel(e); if (!finite(p)) return; stage.current.setPointerCapture?.(e.pointerId); pointers.current.set(e.pointerId, p); gesture.current = null; };
+  const onDown = (e) => { if (tool !== 'pan') return; const p = rel(e); if (!finite(p)) return; stage.current.setPointerCapture?.(e.pointerId); pointers.current.set(e.pointerId, p); gesture.current = null; };
   const onMove = (e) => {
-    if (!nat || !pointers.current.has(e.pointerId)) return;
+    if (tool !== 'pan' || !nat || !pointers.current.has(e.pointerId)) return;
     const prev = pointers.current.get(e.pointerId), cur = rel(e); if (!finite(cur)) return; pointers.current.set(e.pointerId, cur);
     if (pointers.current.size === 1) apply({ scale, x: pos.x + (cur.x - prev.x), y: pos.y + (cur.y - prev.y) });
     else if (pointers.current.size === 2) { // pinch
@@ -88,13 +90,20 @@ export default function ImageViewer({ docId, title, identity }) {
           <button type="button" className="btn icon-btn" aria-label="Actual size" onClick={() => zoomTo(1)} disabled={!nat}><RotateCcw size={20} aria-hidden="true" /></button>
         </div>
       </div>
+      <AnnotationToolbar tool={tool} setTool={setTool} color={color} setColor={setColor} strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
+        strokes={annotations.pages[1] ?? []} onUndo={() => annotations.savePage(1, (annotations.pages[1] ?? []).slice(0, -1))}
+        onClear={() => annotations.savePage(1, [])} status={annotations.status} />
       <div ref={stage} className="image-stage" tabIndex={0} aria-label={`${title}. Drag to pan, scroll or pinch to zoom, plus and minus to zoom, 0 to fit.`}
         onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onKeyDown={onKey} onContextMenu={(e) => e.preventDefault()}>
         <img src={state.url} alt={title} draggable={false} onDragStart={(e) => e.preventDefault()}
           onLoad={(e) => setNat({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           onError={() => setState({ status: 'error' })}
           style={nat ? { width: nat.w, height: nat.h, transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${scale})` } : { visibility: 'hidden' }} />
-        <WatermarkOverlay text={identity} width={size.w} />
+        {nat && <AnnotationLayer page={1} width={nat.w} height={nat.h} strokes={annotations.pages[1] ?? []} tool={tool}
+          color={color} strokeWidth={strokeWidth} onSave={annotations.savePage}
+          disabled={annotations.status === 'loading' || annotations.status === 'error'}
+          style={{ position: 'absolute', left: '50%', top: '50%', width: nat.w, height: nat.h,
+            transform: `translate(calc(-50% + ${pos.x}px), calc(-50% + ${pos.y}px)) scale(${scale})` }} />}
       </div>
     </section>
   );

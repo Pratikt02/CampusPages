@@ -8,7 +8,6 @@ const { openPdf } = await import('./pdfjs.js');
 const { notifyUnauthorized } = await import('../../api/client.js');
 const { default: PdfViewer } = await import('./PdfViewer.jsx');
 
-const IDENTITY = 's*****t@example.edu · 2026-01-05 09:07';
 let renders; let destroy;
 const makePdf = (n) => ({ numPages: n, getPage: vi.fn(async (p) => ({
   getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale }),
@@ -17,7 +16,7 @@ const makePdf = (n) => ({ numPages: n, getPage: vi.fn(async (p) => ({
 })) });
 const load = (n = 5) => { const pdf = makePdf(n); destroy = vi.fn(); openPdf.mockResolvedValue({ promise: Promise.resolve(pdf), destroy }); return pdf; };
 const show = (...nums) => globalThis.__setVisible((el) => nums.includes(Number(el.dataset.page)));
-const mount = (props = {}) => render(<PdfViewer docId="d1" title="OS Notes" identity={IDENTITY} size={123456} {...props} />);
+const mount = (props = {}) => render(<PdfViewer docId="d1" title="OS Notes" size={123456} {...props} />);
 const ready = () => screen.findByRole('toolbar', { name: /document controls/i });
 
 beforeEach(() => {
@@ -79,9 +78,9 @@ describe('PdfViewer', () => {
   it('supports fit-to-width, fit-to-page and preset zoom steps with limits', async () => {
     load(3); mount(); await ready();
     const zoom = () => screen.getByLabelText('Zoom level');
-    await waitFor(() => expect(zoom()).toHaveTextContent('128%'));      // (800-32)/600
-    await userEvent.click(screen.getByRole('button', { name: 'Zoom in' }));  expect(zoom()).toHaveTextContent('150%');
-    await userEvent.click(screen.getByRole('button', { name: 'Zoom out' })); expect(zoom()).toHaveTextContent('125%');
+    await waitFor(() => expect(zoom()).toHaveTextContent('71%'));       // fit-page: (600-32)/800
+    await userEvent.click(screen.getByRole('button', { name: 'Zoom in' }));  expect(zoom()).toHaveTextContent('75%');
+    await userEvent.click(screen.getByRole('button', { name: 'Zoom out' })); expect(zoom()).toHaveTextContent('50%');
     await userEvent.click(screen.getByRole('button', { name: 'Fit to page' })); expect(zoom()).toHaveTextContent('71%');   // height-bound: (600-32)/800
     expect(screen.getByRole('button', { name: 'Fit to page' })).toHaveAttribute('aria-pressed', 'true');
     await userEvent.click(screen.getByRole('button', { name: 'Fit to width' })); expect(zoom()).toHaveTextContent('128%');
@@ -122,16 +121,13 @@ describe('PdfViewer', () => {
   it('supports keyboard zoom shortcuts on the focusable reader', async () => {
     load(2); mount(); await ready();
     const sc = screen.getByLabelText(/document pages/i); expect(sc).toHaveAttribute('tabindex', '0');
-    await waitFor(() => expect(screen.getByLabelText('Zoom level')).toHaveTextContent('128%'));
-    fireEvent.keyDown(sc, { key: '+' }); expect(screen.getByLabelText('Zoom level')).toHaveTextContent('150%');
+    await waitFor(() => expect(screen.getByLabelText('Zoom level')).toHaveTextContent('71%'));
+    fireEvent.keyDown(sc, { key: '+' }); expect(screen.getByLabelText('Zoom level')).toHaveTextContent('75%');
     fireEvent.keyDown(sc, { key: '-' }); fireEvent.keyDown(sc, { key: '0' }); expect(screen.getByLabelText('Zoom level')).toHaveTextContent('128%');
   });
-  it('overlays the watermark on every page placeholder, using the identity it was given', async () => {
+  it('renders no watermark on PDF page placeholders', async () => {
     load(4); mount(); await ready();
-    const marks = screen.getAllByTestId('watermark');
-    expect(marks).toHaveLength(4);
-    for (const m of marks) expect(m).toHaveTextContent(IDENTITY);
-    expect(document.querySelector('.watermark').getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('.watermark')).not.toBeInTheDocument();
   });
   it('blocks the context menu (a casual-copying deterrent only)', async () => {
     load(2); mount(); await ready();

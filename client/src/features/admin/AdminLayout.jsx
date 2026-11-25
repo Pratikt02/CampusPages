@@ -38,7 +38,7 @@ export default function AdminLayout() {
               aria-label={open ? 'Close menu' : 'Open menu'} onClick={() => setOpen((o) => !o)}>{open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}</button>
             <span className="muted admin-user">{user?.name}</span>
             <div className="nav-actions"><ThemeToggle />
-              <button type="button" className="btn" onClick={logout}><LogOut size={18} aria-hidden="true" /><span>Sign out</span></button></div>
+              <button type="button" className="btn btn-danger" onClick={logout}><LogOut size={18} aria-hidden="true" /><span>Sign out</span></button></div>
           </header>
           <main id="main" className="admin-content"><Outlet /></main>
         </div>

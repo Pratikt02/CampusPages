@@ -107,7 +107,7 @@ try:
                     st = canvas_status()
                     if st.get('drawn', 0) and st.get('darkPx', 0) > 20: break
                     time.sleep(0.25)
-                return {'canvas': st, 'zoomLabel': d.find_element(By.CSS_SELECTOR, '.zoom-label').text, 'watermark': d.find_element(By.CSS_SELECTOR, '.watermark').text[:80]}
+                return {'canvas': st, 'zoomLabel': d.find_element(By.CSS_SELECTOR, '.zoom-label').text}
             page('pdf-reader', f'/app/documents/{PDF_ID}', '.pdf-page canvas', pdfcheck)
             def imgcheck():
                 for _ in range(40):

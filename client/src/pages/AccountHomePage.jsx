@@ -9,7 +9,7 @@ export default function AccountHomePage({ area }) {
     <>
       <header className="nav"><div className="container nav-inner">
         <BrandLogo to="/" />
-        <div className="nav-actions"><ThemeToggle /><button className="btn" onClick={logout}>Sign out</button></div>
+        <div className="nav-actions"><ThemeToggle /><button className="btn btn-danger" onClick={logout}>Sign out</button></div>
       </div></header>
       <main id="main" className="container section">
         <h1>Welcome, {user.name}</h1>

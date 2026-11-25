@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2, MoveHorizontal, RefreshCw, ZoomIn, ZoomOut } from 'lucide-react';
 import { openPdf, isRenderCancelled } from './pdfjs.js';
-import { WatermarkOverlay } from './WatermarkOverlay.jsx';
+import { AnnotationLayer } from './AnnotationLayer.jsx';
+import { AnnotationToolbar } from './AnnotationToolbar.jsx';
 import { clamp, contentUrl, fitPageScale, fitWidthScale, nextZoom, outputScaleFor } from './viewMath.js';
 import { notifyUnauthorized } from '../../api/client.js';
 
@@ -9,7 +10,7 @@ const errorText = (e) => (e?.status === 401 ? 'Your session has expired. Please 
   : e?.status === 404 ? 'This document is no longer available.' : 'The document could not be loaded.');
 
 // One page: a placeholder of the right size until it is near the viewport, then a canvas. Far-away pages release their canvas.
-function PdfPage({ pdf, pageNumber, scale, outputDpr, base, root, identity, registerEl }) {
+function PdfPage({ pdf, pageNumber, scale, outputDpr, base, root, registerEl, annotations, tool, color, strokeWidth, savePage }) {
   const ref = useRef(null); const canvas = useRef(null);
   const [near, setNear] = useState(false);
   const [dims, setDims] = useState(base);
@@ -49,12 +50,13 @@ function PdfPage({ pdf, pageNumber, scale, outputDpr, base, root, identity, regi
     <div ref={ref} className="pdf-page" data-page={pageNumber} style={{ position: 'relative', width: w, height: h }} aria-busy={near && !rendered && !failed}>
       <canvas ref={canvas} style={{ width: w, height: h }} role="img" aria-label={`Page ${pageNumber}`} />
       {!rendered && <div className="pdf-page-status muted" role={failed ? 'alert' : undefined}>{failed ? `Page ${pageNumber} could not be displayed.` : `Loading page ${pageNumber}…`}</div>}
-      <WatermarkOverlay text={identity} width={w} />
+      <AnnotationLayer page={pageNumber} width={dims.w} height={dims.h} strokes={annotations.pages[pageNumber] ?? []}
+        tool={tool} color={color} strokeWidth={strokeWidth} onSave={savePage} disabled={annotations.status === 'loading' || annotations.status === 'error'} />
     </div>
   );
 }
 
-export default function PdfViewer({ docId, title, identity, size: fileSize }) {
+export default function PdfViewer({ docId, title, size: fileSize, annotations = { pages: {}, status: 'ready', savePage: () => {} } }) {
   const [state, setState] = useState({ status: 'loading' });
   const [attempt, setAttempt] = useState(0);
   const [mode, setMode] = useState('page'); const [custom, setCustom] = useState(1);
@@ -62,6 +64,7 @@ export default function PdfViewer({ docId, title, identity, size: fileSize }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [outputDpr, setOutputDpr] = useState(() => (window.devicePixelRatio || 1) * (window.visualViewport?.scale || 1));
   const [current, setCurrent] = useState(1); const [pageInput, setPageInput] = useState('1');
+  const [tool, setTool] = useState('pan'); const [color, setColor] = useState('#2563eb'); const [strokeWidth, setStrokeWidth] = useState(0.006);
   const scroller = useRef(null); const els = useRef(new Map()); const raf = useRef(0);
   const registerEl = useCallback((n, el) => { if (el) els.current.set(n, el); else els.current.delete(n); }, []);
 
@@ -172,11 +175,15 @@ export default function PdfViewer({ docId, title, identity, size: fileSize }) {
           </button>
         </div>
       </div>
+      <AnnotationToolbar tool={tool} setTool={setTool} color={color} setColor={setColor} strokeWidth={strokeWidth} setStrokeWidth={setStrokeWidth}
+        strokes={annotations.pages[current] ?? []} onUndo={() => annotations.savePage(current, (annotations.pages[current] ?? []).slice(0, -1))}
+        onClear={() => annotations.savePage(current, [])} status={annotations.status} />
       {/* Context-menu blocking is a casual-copying deterrent only, not a security boundary. */}
       <div ref={scroller} className="viewer-scroll" tabIndex={0} onScroll={onScroll} onKeyDown={onKey} onContextMenu={(e) => e.preventDefault()} aria-label="Document pages. Use plus and minus to zoom, 0 to fit width.">
         <div className="pdf-pages">
           {Array.from({ length: total }, (_, i) => (
-            <PdfPage key={i + 1} pdf={state.pdf} pageNumber={i + 1} scale={scale} outputDpr={outputDpr} base={state.base} root={scroller} identity={identity} registerEl={registerEl} />
+            <PdfPage key={i + 1} pdf={state.pdf} pageNumber={i + 1} scale={scale} outputDpr={outputDpr} base={state.base} root={scroller} registerEl={registerEl}
+              annotations={annotations} tool={tool} color={color} strokeWidth={strokeWidth} savePage={annotations.savePage} />
           ))}
         </div>
       </div>

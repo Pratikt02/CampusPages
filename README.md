@@ -39,7 +39,7 @@ npm run audit:deps    # npm audit for production dependencies
 - Homepage subjects show an honest empty state until the backend provides data (Phase 4).
 
 ## Security limits (honest)
-Content delivered to a browser cannot be fully protected from screenshots, photos, or extraction. Watermarks and viewer restrictions are deterrents, not security boundaries.
+Content delivered to a browser cannot be fully protected from screenshots, photos, or extraction. Viewer restrictions are deterrents, not security boundaries.
 
 ## Phase 2: authentication and authorization
 - Server-side sessions: random 256-bit token in an HTTP-only, SameSite=Lax cookie (`__Host-` prefix and Secure in production). Only the SHA-256 hash is stored; idle (60 min) and absolute (12 h) expiry, TTL index, revocation on logout.
@@ -108,13 +108,13 @@ Open any document from the library (`/app/documents/:id`): a distraction-free re
 
 **PDF reader** (PDF.js 6.4.299, code-split so it is only downloaded when a PDF is opened)
 - Page placeholders keep the scroll height; only pages near the viewport are rendered to a canvas, far-away pages release their canvas, and obsolete render tasks are cancelled when zoom changes or a page leaves the window.
-- Controls (all keyboard-accessible, 44px touch targets, labelled): previous/next page, page-number field, zoom in/out (25%-400%), fit-to-width, fit-to-page; `+`, `-`, `0` shortcuts on the focused reader. Canvas resolution is capped (max 2x device ratio and ~16 MP per page).
+- Opens in fit-to-page view. Controls (all keyboard-accessible, 44px touch targets, labelled): previous/next page, page-number field, zoom in/out (25%-400%), fit-to-width, fit-to-page; `+`, `-`, `0` shortcuts on the focused reader. Canvas resolution is capped (max 2x device ratio and ~16 MP per page).
 - Loading, error and retry states; 401 -> "session expired" (and the app's session-expired flow), 404 -> "no longer available".
 - No download or print buttons. Fullscreen is not implemented.
 
 **Image reader** (JPEG/PNG/WebP): fit-to-view (never upscales small images), zoom 25%-400% with buttons/keys/mouse wheel/pinch, drag-to-pan with clamping, actual-size button, arrow-key panning. The image is fetched with the session cookie into an in-memory object URL (revoked on exit); no URL to the stored file is ever exposed.
 
-**Personalized watermark:** every PDF page and the image stage carry a tiled, non-interactive overlay showing a *masked* email (`s*****t@example.edu`) and the open time. The identity comes from the authenticated session (`/api/auth/me`); URL/query parameters are never used (tested).
+**Personal annotations:** pencil strokes, yellow highlights and tick marks can be added to PDF pages or images. Annotation coordinates are stored per signed-in user, document and page in MongoDB, autosaved through the authenticated API, and automatically expire 15 days after the last edit. Undo and clear-page controls are available; annotations are not shared with other users.
 
 **Daily reading milestones:** time spent with a document open in the visible reader tab is tracked locally per signed-in user and local calendar day. A celebratory modal appears at each completed hour; reading time pauses while the tab is hidden or the celebration is open, and resets at local midnight. Progress is browser-local and is not synchronized across devices.
 
@@ -123,7 +123,7 @@ Open any document from the library (`/app/documents/:id`): a distraction-free re
 ### Limitations (honest)
 - **Not run in a real browser.** Rendering, layout at the required viewport sizes, touch pinch/drag on real devices, the dark theme appearance and real-world PDF.js behavior are unverified. A real PDF.js client was verified against the server in Node (range-only loading, authorization), but canvas rendering was not.
 - **Accessibility trade-off:** pages are canvas images with a label ("Page N") and no text layer, so screen readers cannot read PDF text and text cannot be selected. This is deliberate (casual-copy deterrent) but is a real cost for assistive-technology users; consider an accessible-alternative process for students who need one.
-- Context-menu blocking, non-draggable images, no text selection and the watermark are **deterrents only**. Anything delivered to a browser can be screenshotted, photographed or extracted, and the overlay can be removed by a determined user.
+- Context-menu blocking, non-draggable images and no text selection are **deterrents only**. Anything delivered to a browser can be screenshotted, photographed or extracted.
 - Page placeholders use page 1's size until a page loads, so PDFs with mixed page sizes can shift slightly while scrolling.
 - Requires a modern browser (PDF.js 6) and Node >= 22.13 for development.
 - Dev-tooling audit: `npm audit` (including dev dependencies) reports advisories in the Vite/esbuild/Vitest toolchain; none ship to production (`npm audit --omit=dev`: 0). Upgrading needs major version bumps and is planned for Phase 7.
@@ -133,7 +133,7 @@ Full control matrix, dependency notes and residual risks: [`docs/SECURITY.md`](d
 
 **Added:** per-account login limit, global API limit, session cap (5), "sign out everywhere" (`POST /api/auth/logout-all`), security audit events (CSRF/role/origin denials), request ids and safe one-line request logs with redaction, request timeouts and slow-client server timeouts, PDF parsing in a time- and memory-bounded worker thread, a non-overlapping cleanup sweeper, `no-store` on account/admin responses, graceful shutdown, a strict Content-Security-Policy (`client/public/_headers`; the theme bootstrap is now an external script), and dependency upgrades (patched PDF.js/multer/body-parser, Vite 8, Vitest 5).
 
-**Accessibility/responsive fixes** (found by axe-core, a contrast test, and real-browser runs): dark-theme button text failed AA contrast (4.0:1) with the specified accent, so filled buttons use #4F46E5 and #6366F1 remains the accent for non-text uses; heading order on card lists; button names no longer depend on hidden-text whitespace; the mobile navbar was wider than 390px phones and pushed the menu button off-screen; image "fit" was clamped so it cropped images on 320px phones and "zoom out" could enlarge; watermark text was clipped inside its tiles on narrow pages; admin tables are stacked cards on phones; several tap targets were under 44px.
+**Accessibility/responsive fixes** (found by axe-core, a contrast test, and real-browser runs): dark-theme button text failed AA contrast (4.0:1) with the specified accent, so filled buttons use #4F46E5 and #6366F1 remains the accent for non-text uses; heading order on card lists; button names no longer depend on hidden-text whitespace; the mobile navbar was wider than 390px phones and pushed the menu button off-screen; image "fit" was clamped so it cropped images on 320px phones and "zoom out" could enlarge; admin tables are stacked cards on phones; several tap targets were under 44px.
 
 **Verification run (all executed):**
 - Server tests: 129 passed (real MongoDB). Client tests: 146 passed (incl. axe-core accessibility checks on every major screen and a WCAG contrast check of both themes, 49 pairs).

@@ -23,6 +23,8 @@ beforeEach(() => {
     'GET /api/auth/me': () => json(200, { user: STUDENT, csrfToken: 't' }),
     'POST /api/auth/reading': () => json(204, null),
     'GET /api/documents/d1': () => json(200, META),
+    'GET /api/documents/d1/annotations': () => json(200, { items: [] }),
+    'PUT /api/documents/d1/annotations/1': () => json(200, { saved: true }),
   };
   globalThis.fetch = vi.fn((url, o = {}) => {
     if (url === '/api/documents/d1/content') return content(url, o);
@@ -40,12 +42,10 @@ const loadImage = async (w = 2000, h = 1000) => {
   return screen.findByRole('img', { name: 'OS Notes' });
 };
 const zoom = () => screen.getByLabelText('Zoom level');
-const IDENT = 'u*****t@example.edu · 2026-01-05 09:07';
-
 describe('ImageViewer', () => {
-  const mountImage = () => render(<ImageViewer docId="d1" title="OS Notes" identity={IDENT} />);
+  const mountImage = () => render(<ImageViewer docId="d1" title="OS Notes" />);
 
-  it('fetches with the session cookie, shows the image from an in-memory object URL, watermarks it, and revokes the URL on unmount', async () => {
+  it('fetches the image into memory without a watermark and revokes the object URL on unmount', async () => {
     content.mockImplementation(() => imgResponse());
     const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:abc'); const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const { unmount } = mountImage();
@@ -53,7 +53,7 @@ describe('ImageViewer', () => {
     expect(content.mock.calls[0][1]).toMatchObject({ credentials: 'include' });
     expect(img).toHaveAttribute('src', 'blob:abc'); expect(create).toHaveBeenCalled();
     expect(img).toHaveAttribute('draggable', 'false');
-    expect(screen.getByTestId('watermark')).toHaveTextContent(IDENT);
+    expect(screen.queryByTestId('watermark')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /download|print|save/i })).not.toBeInTheDocument();
     unmount(); expect(revoke).toHaveBeenCalledWith('blob:abc');
   });
@@ -111,7 +111,7 @@ describe('ViewerPage', () => {
   const fakePdf = () => { const pdf = { numPages: 3, getPage: vi.fn(async () => ({ getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale }), render: () => ({ promise: Promise.resolve(), cancel() {} }), cleanup() {} })) };
     openPdf.mockResolvedValue({ promise: Promise.resolve(pdf), destroy: vi.fn() }); };
 
-  it('opens a PDF in the PDF reader with the document title, a back link, and a session-derived masked watermark', async () => {
+  it('opens a PDF in the reader with the document title and a back link, without a watermark', async () => {
     fakePdf(); at('/app/documents/d1');
     expect(await screen.findByRole('toolbar', { name: /document controls/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'OS Notes' })).toBeInTheDocument();
@@ -122,7 +122,7 @@ describe('ViewerPage', () => {
       body: expect.stringContaining('"documentId":"d1"'),
       credentials: 'include',
     }));
-    expect(screen.getAllByTestId('watermark')[0]).toHaveTextContent(/^s\*{5}t@example\.edu · \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+    expect(screen.queryByTestId('watermark')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /download|print/i })).not.toBeInTheDocument();
   });
   it('refreshes reading presence while the note reader stays open and clears it on unmount', async () => {
@@ -145,16 +145,31 @@ describe('ViewerPage', () => {
       clearIntervalSpy.mockRestore();
     }
   });
-  it('ignores identity-looking query parameters: the watermark always comes from the authenticated session', async () => {
+  it('does not render a watermark even when identity-like query parameters are present', async () => {
     fakePdf(); at('/app/documents/d1?watermark=attacker@evil.com&user=admin@example.edu&email=boss@x.org');
-    await screen.findByRole('toolbar');
-    const text = screen.getAllByTestId('watermark').map((n) => n.textContent).join(' ');
-    expect(text).toContain('s*****t@example.edu'); expect(text).not.toMatch(/attacker|evil|boss|admin/);
+    await screen.findByRole('toolbar', { name: /document controls/i });
+    expect(screen.queryByTestId('watermark')).not.toBeInTheDocument();
   });
   it('opens images in the image reader', async () => {
     routes['GET /api/documents/d1'] = () => json(200, { ...META, fileType: 'image', pageCount: null, width: 2000, height: 1000 });
     content.mockImplementation(() => imgResponse()); at('/app/documents/d1');
     await loadImage(); expect(openPdf).not.toHaveBeenCalled(); expect(screen.getByRole('toolbar', { name: /image controls/i })).toBeInTheDocument();
+  });
+  it('draws on an image and saves normalized strokes for the current user/document page', async () => {
+    routes['GET /api/documents/d1'] = () => json(200, { ...META, fileType: 'image', pageCount: null, width: 2000, height: 1000 });
+    content.mockImplementation(() => imgResponse()); at('/app/documents/d1'); await loadImage();
+    await userEvent.click(screen.getByRole('button', { name: 'Pencil' }));
+    const layer = screen.getByLabelText('Annotations on page 1');
+    vi.spyOn(layer, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 200, height: 100 });
+    fireEvent.pointerDown(layer, { pointerId: 1, clientX: 20, clientY: 30 });
+    fireEvent.pointerMove(layer, { pointerId: 1, clientX: 80, clientY: 60 });
+    fireEvent.pointerUp(layer, { pointerId: 1 });
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/documents/d1/annotations/1', expect.objectContaining({ method: 'PUT' })));
+    const request = fetch.mock.calls.find(([url, options]) => url.endsWith('/annotations/1') && options.method === 'PUT');
+    expect(JSON.parse(request[1].body).strokes[0]).toMatchObject({
+      tool: 'pencil', color: '#2563eb', points: [{ x: 0.1, y: 0.3 }, { x: 0.4, y: 0.6 }],
+    });
+    expect(await screen.findByText(/saved · annotations expire 15 days/i)).toBeInTheDocument();
   });
   it('shows a friendly message for a document that is unavailable (404) and a retry for server errors', async () => {
     routes['GET /api/documents/d1'] = () => json(404, { error: { code: 'NOT_FOUND', message: 'Document not found.' } });

@@ -2946,18 +2946,30 @@ body {
 /* Viewer */
 .viewer-page { display: flex; flex-direction: column; height: 100dvh; background: #333; }
 .viewer-header {
-  display: flex; align-items: center; gap: .75rem; padding: .3rem .75rem; min-height: 3rem;
+  display: flex; align-items: center; gap: .5rem; padding: 0 .5rem; min-height: 2.75rem;
   background: var(--surface); border-bottom: 1px solid var(--border); box-shadow: var(--shadow-sm); z-index: 20;
 }
-.viewer-title { flex: 1; min-width: 0; margin: 0; font-size: 1.1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-title { flex: 1; min-width: 0; margin: 0; font-size: 1rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-toolbar {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-6);
-  padding: .15rem .5rem; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-4);
+  padding: 0 .35rem; background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.viewer-toolbar .tool-group { display: flex; align-items: center; gap: .2rem; flex-wrap: wrap; }
-.viewer-toolbar .icon-btn { min-width: 2.5rem; min-height: 2.5rem; padding: .35rem; }
+.viewer-toolbar .tool-group { display: flex; align-items: center; gap: .1rem; flex-wrap: wrap; }
+.viewer-toolbar .icon-btn { min-width: 2.35rem; min-height: 2.35rem; padding: .2rem; }
 .zoom-label { min-width: 4rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
 .page-form input { width: 3.25rem; min-height: 2.25rem; padding: 0.2rem; text-align: center; font-weight: 700; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg); }
+.annotation-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .2rem .5rem;
+  padding: .1rem .35rem; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.annotation-tool-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem; }
+.annotation-toolbar .icon-btn { min-width: 2.25rem; min-height: 2.25rem; padding: .2rem; }
+.annotation-tool-active { color: var(--brand); border-color: var(--brand); background: var(--surface-2); }
+.annotation-setting { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 650; color: var(--text-muted); }
+.annotation-setting input[type="color"] { width: 1.75rem; height: 1.75rem; padding: .1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.annotation-setting input[type="range"] { width: 3.5rem; accent-color: var(--brand); }
+.annotation-status { font-size: .75rem; color: var(--text-muted); }
+.annotation-status--error { color: var(--danger-solid); }
 
 .viewer-scroll, .image-stage { flex: 1; min-height: 0; background: var(--surface-3); position: relative; }
 .viewer-scroll { background: #333; }
@@ -2984,6 +2996,10 @@ body {
 
 .pdf-page { flex: 0 0 auto; background: #fff; box-shadow: 0 2px 12px rgb(0 0 0 / .35); border-radius: 0; overflow: hidden; }
 .pdf-page-status { color: #475569; position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 1rem; }
+.pdf-page-status { z-index: 1; }
+.annotation-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+.annotation-layer--active { pointer-events: all; touch-action: none; cursor: crosshair; }
+.image-stage > img { position: absolute; left: 50%; top: 50%; max-width: none; transform-origin: center; }
 
 /* PDF reader compact mode is positioned against the viewport, not the document flow. */
 .viewer-main {
@@ -3033,7 +3049,7 @@ body {
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 1rem;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 24px 72px rgb(15 23 42 / 0.32);
   animation: pdf-viewer-fade-in 180ms ease-out both;
 }
@@ -3044,7 +3060,7 @@ body {
 
 .viewer.viewer--minimized .viewer-scroll {
   min-height: 0;
-  background: #fff;
+  background: #333;
 }
 
 .viewer.viewer--minimized .pdf-pages {
@@ -3053,7 +3069,7 @@ body {
   align-items: center;
 }
 
-/* Keep pages centered on the dark document canvas at every zoom level. */
+/* Keep pages centered on the charcoal document canvas at every zoom level. */
 .viewer.viewer--fullscreen .pdf-pages { min-width: 100%; }
 
 @keyframes pdf-viewer-fade-in {
@@ -3223,9 +3239,11 @@ body {
   .viewer-brand { grid-column: 1; grid-row: 2; justify-self: start; }
   .viewer-brand .brand { font-size: 1rem; }
   .viewer-actions { grid-column: 2; grid-row: 1 / span 2; }
-  .viewer-toolbar { justify-content: center; gap: .35rem; padding: .35rem; }
-  .viewer-toolbar .tool-group { justify-content: center; gap: .15rem; }
-  .viewer-toolbar .icon-btn { min-width: 2.35rem; min-height: 2.35rem; }
+  .viewer-toolbar { justify-content: center; gap: .15rem; padding: 0 .2rem; }
+  .viewer-toolbar .tool-group { justify-content: center; gap: .1rem; }
+  .viewer-toolbar .icon-btn { min-width: 2.25rem; min-height: 2.25rem; }
+  .annotation-toolbar { justify-content: center; }
+  .annotation-status { flex-basis: 100%; text-align: center; }
   .zoom-label { min-width: 3.2rem; font-size: .85rem; }
   .viewer-main { padding: .5rem; }
 
